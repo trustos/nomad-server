@@ -178,8 +178,6 @@ if systemctl is-active --quiet nomad; then
  systemctl restart nomad
 fi
 
-# Install nomad-ops
-install_nomad_ops
 # Always write the Nomad systemd service file and enable/start Nomad
 
 if pidof systemd &>/dev/null && [ -d /run/systemd/system ]; then
@@ -212,4 +210,8 @@ EOF
 
   echo "Nomad setup complete."
 fi
+
+# Install nomad-ops
+install_nomad_ops
+
 exit 0
