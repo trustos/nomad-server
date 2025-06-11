@@ -93,6 +93,58 @@ create_nomad_user() {
   echo "Nomad user created."
 }
 
+# Function to wait for Nomad API to be available
+wait_for_nomad() {
+  echo "Waiting for Nomad API to be available at http://127.0.0.1:4646 ..."
+  for i in {1..30}; do
+    if curl -s http://127.0.0.1:4646/v1/status/leader >/dev/null; then
+      echo "Nomad API is available."
+      return 0
+    fi
+    sleep 2
+  done
+  echo "Nomad API did not become available in time."
+  exit 1
+}
+
+# Function to install nomad-ops from source and deploy via Nomad job
+install_nomad_ops() {
+  echo "Installing nomad-ops from source..."
+
+  # Ensure git is installed before proceeding
+  if ! command -v git &> /dev/null; then
+    echo "git not found. Installing git..."
+    if command -v apt-get &> /dev/null; then
+      apt-get update -y && apt-get install -y git
+    elif command -v yum &> /dev/null; then
+      yum install -y git
+    elif command -v dnf &> /dev/null; then
+      dnf install -y git
+    else
+      echo "Unsupported Linux distribution. Please install git manually."
+      exit 1
+    fi
+  fi
+
+  # Clone nomad-ops repo if not already present
+  if [ ! -d "/opt/nomad-ops" ]; then
+    git clone https://github.com/nomad-ops/nomad-ops.git /opt/nomad-ops
+  fi
+
+  cd /opt/nomad-ops
+
+  # Wait for Nomad to be ready
+  wait_for_nomad
+
+  # Ensure Nomad namespace exists
+  nomad namespace apply nomad-ops
+
+  # Deploy nomad-ops job
+  nomad job run .deployment/nomad/docker.hcl
+
+  echo "nomad-ops deployment via Nomad job complete."
+}
+
 # Main script execution
 echo "Starting Nomad setup..."
 
@@ -107,6 +159,9 @@ mkdir -p /etc/nomad.d
 
 # Configure Nomad
 configure_nomad
+
+# Install nomad-ops
+install_nomad_ops
 
 # Check for systemd before proceeding with service setup
 if pidof systemd &>/dev/null && [ -d /run/systemd/system ]; then
