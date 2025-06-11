@@ -188,10 +188,11 @@ systemctl enable nomad
 systemctl restart nomad
 
 echo "Nomad setup complete."
-exit 0
 fi
 
 # ----====== Third Parties =======----
 
 # Install nomad-ops
 install_nomad_ops
+
+exit 0
