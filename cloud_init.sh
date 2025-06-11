@@ -90,6 +90,17 @@ EOF
 create_nomad_user() {
   echo "Creating nomad user..."
   useradd -r -s /bin/false nomad
+
+  # Ensure docker group exists
+  if ! getent group docker > /dev/null; then
+    echo "docker group does not exist. Creating docker group..."
+    groupadd docker
+    # Restart Docker to ensure it uses the correct group
+    if systemctl is-active --quiet docker; then
+      systemctl restart docker
+    fi
+  fi
+
   # Add nomad user to docker group so it can interact with Docker
   usermod -aG docker nomad
   echo "Nomad user created and added to docker group."
