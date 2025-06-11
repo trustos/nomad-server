@@ -201,6 +201,9 @@ ExecReload=/bin/kill -HUP \$MAINPID
 KillMode=process
 KillSignal=SIGINT
 Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
