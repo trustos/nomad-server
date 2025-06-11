@@ -160,9 +160,6 @@ mkdir -p /etc/nomad.d
 # Configure Nomad
 configure_nomad
 
-# Install nomad-ops
-install_nomad_ops
-
 # Check for systemd before proceeding with service setup
 if pidof systemd &>/dev/null && [ -d /run/systemd/system ]; then
   echo "systemd detected. Proceeding with service setup..."
@@ -193,3 +190,8 @@ systemctl restart nomad
 echo "Nomad setup complete."
 exit 0
 fi
+
+# ----====== Third Parties =======----
+
+# Install nomad-ops
+install_nomad_ops
