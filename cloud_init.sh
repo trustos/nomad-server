@@ -1,4 +1,3 @@
-NomadServer/cloud_init.sh
 #!/bin/bash
 #cloud-config
 
@@ -7,50 +6,19 @@ NOMAD_VERSION="1.10.1" # Replace with desired Nomad version
 DATA_DIR="/opt/nomad" # Replace if you want a different data directory
 LOG_LEVEL="INFO" # The log level to use for log streaming. Defaults to info. Possible values include trace, debug, info, warn, error
 
-# Function to create a nomad user and ensure docker group membership
-create_nomad_user() {
-  echo "Creating nomad user and ensuring docker group membership..."
-
-  # Create nomad user if it doesn't exist
-  if ! id nomad &>/dev/null; then
-    useradd -r -s /bin/false nomad
-    echo "Nomad user created."
-  else
-    echo "Nomad user already exists."
-  fi
-
-  # Ensure docker group exists
-  if ! getent group docker > /dev/null; then
-    echo "docker group does not exist. Creating docker group..."
-    groupadd docker
-  else
-    echo "docker group already exists."
-  fi
-
-  # Add nomad user to docker group
-  usermod -aG docker nomad
-  echo "Nomad user added to docker group."
-
-  # Always restart Docker to ensure it uses the correct group
-  if systemctl is-active --quiet docker; then
-    echo "Restarting Docker to ensure group membership is correct..."
-    systemctl restart docker
-  fi
-}
-
 # Function to install Nomad using the specified version
 install_nomad() {
   echo "Installing Nomad version $NOMAD_VERSION..."
 
   # Install dependencies
   if command -v apt-get &> /dev/null; then
-    apt-get update -y && apt-get install -y wget unzip curl
+    apt-get update -y && apt-get install -y wget unzip
   elif command -v yum &> /dev/null; then
-    yum install -y wget unzip curl
+    yum install -y wget unzip
   elif command -v dnf &> /dev/null; then
-    dnf install -y wget unzip curl
+    dnf install -y wget unzip
   else
-    echo "Unsupported Linux distribution. Please install wget, unzip, and curl manually."
+    echo "Unsupported Linux distribution. Please install wget and unzip manually."
     exit 1
   fi
 
@@ -83,7 +51,7 @@ install_nomad() {
   cd /tmp
   echo "Downloading $NOMAD_URL"
   wget "$NOMAD_URL"
-  unzip -o "$NOMAD_ZIP"
+  unzip "$NOMAD_ZIP"
   mv nomad /usr/local/bin/
   chmod +x /usr/local/bin/nomad
 
@@ -99,7 +67,6 @@ configure_nomad() {
   chown nomad:nomad "$DATA_DIR" # Assuming nomad user exists
 
   # Create minimal Nomad configuration file.  Adjust as needed.
-  mkdir -p /etc/nomad.d
   cat > /etc/nomad.d/nomad.hcl <<EOF
 log_level = "$LOG_LEVEL"
 data_dir = "$DATA_DIR"
@@ -117,6 +84,26 @@ EOF
 
   chown nomad:nomad /etc/nomad.d/nomad.hcl # Assuming nomad user exists
   echo "Nomad configuration complete."
+}
+
+# Function to create a nomad user
+create_nomad_user() {
+  echo "Creating nomad user..."
+  useradd -r -s /bin/false nomad
+
+  # Ensure docker group exists
+  if ! getent group docker > /dev/null; then
+    echo "docker group does not exist. Creating docker group..."
+    groupadd docker
+    # Restart Docker to ensure it uses the correct group
+    if systemctl is-active --quiet docker; then
+      systemctl restart docker
+    fi
+  fi
+
+  # Add nomad user to docker group so it can interact with Docker
+  usermod -aG docker nomad
+  echo "Nomad user created and added to docker group."
 }
 
 # Function to wait for Nomad API to be available
@@ -137,7 +124,7 @@ wait_for_nomad() {
 install_nomad_ops() {
   echo "Installing nomad-ops from source..."
 
-  # Ensure git is installed
+  # Ensure git is installed before proceeding
   if ! command -v git &> /dev/null; then
     echo "git not found. Installing git..."
     if command -v apt-get &> /dev/null; then
@@ -166,35 +153,33 @@ install_nomad_ops() {
   nomad namespace apply nomad-ops
 
   # Deploy nomad-ops job
-  if [ -f ".deployment/nomad/docker.hcl" ]; then
-    nomad job run .deployment/nomad/docker.hcl
-    echo "nomad-ops deployment via Nomad job complete."
-  else
-    echo "Nomad-ops job file .deployment/nomad/docker.hcl not found!"
-  fi
+  nomad job run .deployment/nomad/docker.hcl
+
+  echo "nomad-ops deployment via Nomad job complete."
 }
 
 # Main script execution
 echo "Starting Nomad setup..."
 
-# Create nomad user and ensure docker group membership
+# Create nomad user
 create_nomad_user
 
 # Install Nomad
 install_nomad
+
+# Create /etc/nomad.d directory
+mkdir -p /etc/nomad.d
 
 # Configure Nomad
 configure_nomad
 
 # Always restart Nomad after user/group/docker changes to ensure permissions are correct
 if systemctl is-active --quiet nomad; then
-  echo "Restarting Nomad agent to ensure group membership and permissions are correct..."
-  systemctl restart nomad
+ systemctl restart nomad
 fi
 
 # Install nomad-ops
 install_nomad_ops
-
 # Check for systemd before proceeding with service setup
 if pidof systemd &>/dev/null && [ -d /run/systemd/system ]; then
   echo "systemd detected. Proceeding with service setup..."
@@ -209,9 +194,25 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-User=nomad
-Group=nomad
+User=root
+Group=root
 ExecStart=/usr/local/bin/nomad agent -config=/etc/nomad.d
 ExecReload=/bin/kill -HUP \$MAINPID
 KillMode=process
-KillSignal=SIG
+KillSignal=SIGINT
+Restart=on-failure
+EOF
+
+systemctl daemon-reload
+systemctl enable nomad
+systemctl restart nomad
+
+echo "Nomad setup complete."
+fi
+
+# ----====== Third Parties =======----
+
+# Install nomad-ops
+install_nomad_ops
+
+exit 0
