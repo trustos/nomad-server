@@ -17,11 +17,19 @@ docker-check: install-deps
 docker-login: docker-check
 	echo $$GITHUB_TOKEN | docker login ghcr.io -u $$GITHUB_USERNAME --password-stdin
 
-docker-build: docker-check
-	docker build --build-arg PB_VERSION=$(PB_VERSION) -f $(DOCKERFILE) -t $(IMAGE_NAME):$(TAG) .
+ARCHS = amd64 arm64
 
-docker-push: docker-check
-	docker push $(IMAGE_NAME):$(TAG)
-	@echo "Image pushed to: $(IMAGE_NAME):$(TAG)"
+buildx-init:
+	docker-buildx create --name pocketbasebuilder || true
+	docker-buildx use pocketbasebuilder
+	docker-buildx inspect pocketbasebuilder --bootstrap
 
-docker-all: docker-login docker-build docker-push
+docker-build: buildx-init docker-check
+	docker-buildx build --platform linux/amd64,linux/arm64 \
+		--build-arg PB_VERSION=$(PB_VERSION) \
+		-f $(DOCKERFILE) \
+		-t $(IMAGE_NAME):$(TAG) \
+		--push . \
+		--provenance=false
+
+docker-all: buildx-init docker-login docker-build
