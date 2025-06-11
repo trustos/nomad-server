@@ -180,11 +180,11 @@ fi
 
 # Install nomad-ops
 install_nomad_ops
-# Check for systemd before proceeding with service setup
+# Always write the Nomad systemd service file and enable/start Nomad
+
 if pidof systemd &>/dev/null && [ -d /run/systemd/system ]; then
   echo "systemd detected. Proceeding with service setup..."
 
-  # Write the Nomad systemd service file directly
   echo "Writing Nomad systemd service file to /etc/systemd/system/nomad.service..."
   cat > /etc/systemd/system/nomad.service <<EOF
 [Unit]
@@ -206,16 +206,10 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable nomad
-systemctl restart nomad
+  systemctl daemon-reload
+  systemctl enable nomad
+  systemctl restart nomad
 
-echo "Nomad setup complete."
+  echo "Nomad setup complete."
 fi
-
-# ----====== Third Parties =======----
-
-# Install nomad-ops
-install_nomad_ops
-
 exit 0
