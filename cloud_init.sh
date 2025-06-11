@@ -90,7 +90,9 @@ EOF
 create_nomad_user() {
   echo "Creating nomad user..."
   useradd -r -s /bin/false nomad
-  echo "Nomad user created."
+  # Add nomad user to docker group so it can interact with Docker
+  usermod -aG docker nomad
+  echo "Nomad user created and added to docker group."
 }
 
 # Function to wait for Nomad API to be available
