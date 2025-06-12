@@ -78,6 +78,19 @@ server {
 
 client {
   enabled = true
+
+  host_volume "pocketbase_data" {
+    path      = "/opt/nomad/pocketbase_data"
+    read_only = false
+  }
+}
+
+plugin "docker" {
+  config {
+    volumes {
+      enabled = true
+    }
+  }
 }
 
 EOF
