@@ -1,4 +1,3 @@
-NomadServer/pocketbase.nomad.hcl
 job "pocketbase" {
   datacenters = ["dc1"]
 
