@@ -64,7 +64,9 @@ configure_nomad() {
 
   # Create data directory
   mkdir -p "$DATA_DIR"
+  mkdir -p "$DATA_DIR/alloc"
   chown nomad:nomad "$DATA_DIR" # Assuming nomad user exists
+  chown nomad:nomad "$DATA_DIR/alloc" # Assuming nomad user exists
 
   # Create minimal Nomad configuration file.  Adjust as needed.
   cat > /etc/nomad.d/nomad.hcl <<EOF
@@ -79,10 +81,7 @@ server {
 client {
   enabled = true
 
-  host_volume "pocketbase_data" {
-    path      = "/opt/nomad/pocketbase_data"
-    read_only = false
-  }
+  alloc_dir = "$DATA_DIR/alloc"
 }
 
 plugin "docker" {
