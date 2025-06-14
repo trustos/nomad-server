@@ -1,6 +1,5 @@
 // Describes the volume we want Nomad to create and manage.
-id   = "pocketbase-data-vol"
-name = "PocketBase Data"
+name = "pocketbase-data-vol"
 type = "host"
 
 // Specifies that the volume should be placed on a node with the docker plugin.

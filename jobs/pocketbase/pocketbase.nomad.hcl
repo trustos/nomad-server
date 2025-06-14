@@ -21,17 +21,17 @@ job "pocketbase" {
           config {
               image = "ghcr.io/trustos/pocketbase:0.28.3"
               ports = ["http"]
+
+              volume_mount {
+                  volume      = "pocketbase_data"
+                  destination = "/pb_data"
+                  read_only   = false
+              }
           }
 
           resources {
               cpu    = 500
               memory = 256
-          }
-
-          volume_mount {
-              volume      = "pocketbase_data"
-              destination = "/pb_data"
-              read_only   = false
           }
       }
   }
