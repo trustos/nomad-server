@@ -22,11 +22,10 @@ job "pocketbase" {
               image = "ghcr.io/trustos/pocketbase:0.28.3"
               ports = ["http"]
 
-              volume_mount {
-                  volume      = "pocketbase_data"
-                  destination = "/pb_data"
-                  read_only   = false
-              }
+              # This is the correct and confirmed syntax
+              volumes = [
+                "pocketbase_data:/pb_data" # "volume_stanza_name:container_path"
+              ]
           }
 
           resources {
