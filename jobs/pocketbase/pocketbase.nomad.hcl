@@ -12,8 +12,7 @@ job "pocketbase" {
 
       volume "pocketbase_data" {
           type      = "host"
-          read_only = false
-          source    = "alloc"
+          source    = "pocketbase-data-vol"
       }
 
       task "pocketbase" {
