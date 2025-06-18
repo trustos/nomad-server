@@ -28,7 +28,7 @@ job "pocketbase" {
 
           volume_mount {
               volume      = "pocketbase_data"
-              destination = "/pb_data"
+              destination = "/pb/pb_data"
           }
 
           resources {
