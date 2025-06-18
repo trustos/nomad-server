@@ -12,7 +12,7 @@ job "pocketbase" {
 
       volume "pocketbase_data" {
           type      = "host"
-          source    = "pocketbase-data-vol"
+          source    = "pocketbase-data"
       }
 
       task "pocketbase" {

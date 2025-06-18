@@ -80,8 +80,6 @@ server {
 
 client {
   enabled = true
-
-  alloc_dir = "$DATA_DIR/alloc"
 }
 
 plugin "docker" {
