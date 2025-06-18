@@ -1,6 +1,9 @@
 // Describes the volume we want Nomad to create and manage.
 name = "pocketbase-data-vol"
 type = "host"
+capacity    = "10Gi"               # Optional: Nomad won't enforce this for 'mkdir', but good practice
+access_mode = "single-node-writer"
+attachment_mode = "file-system"
 
 // Specifies that the volume should be placed on a node with the docker plugin.
 plugin_id = "mkdir"

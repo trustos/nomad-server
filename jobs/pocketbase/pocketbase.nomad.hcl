@@ -12,7 +12,10 @@ job "pocketbase" {
 
       volume "pocketbase_data" {
           type      = "host"
-          source    = "pocketbase-data"
+          source      = "pocketbase-data-vol"
+          read_only   = false
+          # You might want to add sticky = true here for persistent data with single allocations
+          sticky      = true
       }
 
       task "pocketbase" {
