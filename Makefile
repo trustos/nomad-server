@@ -28,11 +28,11 @@ docker-login: docker-check
 ARCHS = amd64 arm64
 
 buildx-init:
-	docker-buildx create --name pocketbasebuilder || true
-	docker-buildx use pocketbasebuilder
-	docker-buildx inspect pocketbasebuilder --bootstrap
+	docker-buildx create --name builder || true
+	docker-buildx use builder
+	docker-buildx inspect builder --bootstrap
 
-docker-build: buildx-init docker-check
+pb-docker-build: buildx-init docker-check
 	docker-buildx build --platform linux/amd64,linux/arm64 \
 		--build-arg PB_VERSION=$(PB_VERSION) \
 		-f $(DOCKERFILE) \
@@ -40,7 +40,7 @@ docker-build: buildx-init docker-check
 		--push . \
 		--provenance=false
 
-docker-all: buildx-init docker-login docker-build
+pocketbase-all: buildx-init docker-login pb-docker-build
 
 .PHONY: nomad-ops-clone
 nomad-ops-clone:
