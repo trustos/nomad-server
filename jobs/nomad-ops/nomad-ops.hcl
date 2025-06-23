@@ -66,7 +66,7 @@ job "nomad-ops" {
         NOMAD_OPS_LOCAL_REPO_DIR = "/data/repos"
 
         # Adjust accordingly
-        NOMAD_ADDR = "{{ GetPrivateIP }}"
+        NOMAD_ADDR = "0.0.0.0"
         # comment and provide a NOMAD_TOKEN instead
         NOMAD_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/nomad_token"
 
