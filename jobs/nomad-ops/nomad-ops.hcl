@@ -20,7 +20,7 @@ job "nomad-ops" {
     count = 1
 
     network {
-      mode = "host"
+      # mode = "host"
       port "http" {
         static = 8080
       }
