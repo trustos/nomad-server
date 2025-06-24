@@ -244,17 +244,17 @@ install_nomad_ops() {
 
   # Clone nomad-ops repo if not already present
   if [ ! -d "/opt/nomad-ops" ]; then
-    git clone https://github.com/nomad-ops/nomad-ops.git /opt/nomad-ops
+    git clone https://github.com/trustos/nomad-server.git /opt/nomad-ops
   fi
 
-  cd /opt/nomad-ops
+  cd /opt/nomad-ops/jobs/nomad-ops
 
   # Wait for Nomad to be ready
   wait_for_nomad
 
   # Deploy nomad-ops job
   NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token)
-  NOMAD_TOKEN=$NOMAD_TOKEN nomad job run .deployment/nomad/docker.hcl
+  NOMAD_TOKEN=$NOMAD_TOKEN nomad job run nomad-ops.nomad.hcl
 
   echo "nomad-ops deployment via Nomad job complete."
 }
