@@ -254,7 +254,7 @@ install_nomad_ops() {
 
   # Deploy nomad-ops job
   NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token)
-  NOMAD_TOKEN=$NOMAD_TOKEN nomad job run nomad-ops.nomad.hcl
+  NOMAD_TOKEN=$NOMAD_TOKEN nomad job run /opt/nomad-ops/jobs/nomad-ops/nomad-ops.nomad.hcl
 
   echo "nomad-ops deployment via Nomad job complete."
 }
