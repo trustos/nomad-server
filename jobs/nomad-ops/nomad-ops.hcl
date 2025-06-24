@@ -61,12 +61,19 @@ job "nomad-ops" {
         file = true
       }
 
+      template {
+        data = <<EOH
+NOMAD_ADDR=http://{{ GetPrivateIP }}
+EOH
+        destination = "${NOMAD_SECRETS_DIR}/nomad_addr.env"
+        env         = true
+      }
+
       env {
 
         NOMAD_OPS_LOCAL_REPO_DIR = "/data/repos"
 
-        # Adjust accordingly
-        NOMAD_ADDR = "0.0.0.0"
+        # NOMAD_ADDR will be loaded from the template above
         # comment and provide a NOMAD_TOKEN instead
         NOMAD_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/nomad_token"
 
