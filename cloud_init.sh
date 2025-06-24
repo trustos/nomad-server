@@ -290,6 +290,13 @@ fi
 # Setup Nomad ACLs and tokens for nomad-ops
 setup_nomad_acl
 
+# Create the nomad-ops-data volume required by the job
+if [ -f "/opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl" ]; then
+  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create /opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl
+else
+  echo "WARNING: /opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl not found. Skipping volume creation."
+fi
+
 # Install nomad-ops
 install_nomad_ops
 
