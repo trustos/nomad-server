@@ -324,9 +324,14 @@ if [ ! -d "/opt/nomad-ops" ]; then
 git clone https://github.com/trustos/nomad-server.git /opt/nomad-ops
 fi
 
+
+
+# NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-policy /opt/nomad/policies/nomad-ops-policy.hcl
+# NOMAD_TOKEN=$MGMT_TOKEN nomad acl token create -name="nomad-ops" -policy="nomad-ops-policy"
+
 # Create the nomad-ops-data volume required by the job
 if [ -f "/opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl" ]; then
-  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create /opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl
+  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create -namespace=nomad-ops /opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl
 else
   echo "WARNING: /opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl not found. Skipping volume creation."
 fi
