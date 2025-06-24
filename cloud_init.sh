@@ -242,13 +242,6 @@ install_nomad_ops() {
     fi
   fi
 
-  # Clone nomad-ops repo if not already present
-  if [ ! -d "/opt/nomad-ops" ]; then
-    git clone https://github.com/trustos/nomad-server.git /opt/nomad-ops
-  fi
-
-  cd /opt/nomad-ops/jobs/nomad-ops
-
   # Wait for Nomad to be ready
   wait_for_nomad
 
@@ -322,6 +315,11 @@ fi
 
 # Setup Nomad ACLs and tokens for nomad-ops
 setup_nomad_acl
+
+# Clone nomad-ops repo if not already present
+if [ ! -d "/opt/nomad-ops" ]; then
+git clone https://github.com/trustos/nomad-server.git /opt/nomad-ops
+fi
 
 # Create the nomad-ops-data volume required by the job
 if [ -f "/opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl" ]; then
