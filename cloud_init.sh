@@ -192,33 +192,17 @@ setup_nomad_acl() {
 
   MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
 
-  # Create the nomad-ops namespace (idempotent)
-  NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply nomad-ops
-
-  # Write the ACL policy definition to a non-config directory
-  mkdir -p /opt/nomad/policies
-  cat > /opt/nomad/policies/nomad-ops-policy.hcl <<EOF
-namespace "nomad-ops" {
-  policy = "write"
-}
-node {
-  policy = "read"
-}
-volume {
-  policy = "write"
-}
-EOF
-
-  # Apply the policy (idempotent)
-  NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-policy /opt/nomad/policies/nomad-ops-policy.hcl
+  # Apply the superuser policy from the repo
+  POLICY_PATH="/opt/nomad-ops/.deployment/nomad/acl.hcl"
+  NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-superuser "$POLICY_PATH"
 
   # Create a token for nomad-ops (idempotent: check if already created)
   if [ ! -f /etc/nomad.d/nomad-ops-token ]; then
-    NOMAD_TOKEN=$MGMT_TOKEN nomad acl token create -name="nomad-ops" -policy="nomad-ops-policy" -json > /etc/nomad.d/nomad-ops-token
+    NOMAD_TOKEN=$MGMT_TOKEN nomad acl token create -name="nomad-ops" -policy="nomad-ops-superuser" -json > /etc/nomad.d/nomad-ops-token
   fi
   NOMAD_OPS_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-ops-token)
 
-  # Write the token to the expected location for the job
+  # Write the token to the expected location for the job (no newline)
   echo -n "$NOMAD_OPS_TOKEN" > /etc/nomad.d/nomad_token
   chmod 600 /etc/nomad.d/nomad_token
   chown nomad:nomad /etc/nomad.d/nomad_token
