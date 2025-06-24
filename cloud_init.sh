@@ -204,6 +204,9 @@ namespace "nomad-ops" {
 node {
   policy = "read"
 }
+volume {
+  policy = "write"
+}
 EOF
 
   # Apply the policy (idempotent)
