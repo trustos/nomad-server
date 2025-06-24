@@ -78,7 +78,9 @@ install_docker() {
       tee /etc/apt/sources.list.d/docker.list > /dev/null
     apt-get update
 
-    sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    systemctl enable --now docker
 }
 
 # Function to configure Nomad (minimal config)
