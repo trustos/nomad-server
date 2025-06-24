@@ -219,7 +219,7 @@ EOF
   NOMAD_OPS_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-ops-token)
 
   # Write the token to the expected location for the job
-  echo "$NOMAD_OPS_TOKEN" > /etc/nomad.d/nomad_token
+  echo -n "$NOMAD_OPS_TOKEN" > /etc/nomad.d/nomad_token
   chmod 600 /etc/nomad.d/nomad_token
   chown nomad:nomad /etc/nomad.d/nomad_token
 
