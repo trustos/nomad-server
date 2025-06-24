@@ -300,13 +300,13 @@ EOF
   echo "Nomad setup complete."
 fi
 
-# Setup Nomad ACLs and tokens for nomad-ops
-setup_nomad_acl
-
 # Clone nomad-ops repo if not already present
 if [ ! -d "/opt/nomad-ops" ]; then
-git clone https://github.com/trustos/nomad-server.git /opt/nomad-ops
+  git clone https://github.com/trustos/nomad-server.git /opt/nomad-ops
 fi
+
+# Setup Nomad ACLs and tokens for nomad-ops
+setup_nomad_acl
 
 
 
