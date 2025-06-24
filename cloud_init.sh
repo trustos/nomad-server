@@ -227,7 +227,8 @@ install_nomad_ops() {
   wait_for_nomad
 
   # Deploy nomad-ops job
-  nomad job run .deployment/nomad/docker.hcl
+  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token)
+  NOMAD_TOKEN=$NOMAD_TOKEN nomad job run .deployment/nomad/docker.hcl
 
   echo "nomad-ops deployment via Nomad job complete."
 }
