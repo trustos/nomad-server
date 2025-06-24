@@ -170,8 +170,9 @@ setup_nomad_acl() {
   # Create the nomad-ops namespace (idempotent)
   NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply nomad-ops
 
-  # Write the ACL policy definition
-  cat > /etc/nomad.d/nomad-ops-policy.hcl <<EOF
+  # Write the ACL policy definition to a non-config directory
+  mkdir -p /opt/nomad/policies
+  cat > /opt/nomad/policies/nomad-ops-policy.hcl <<EOF
 namespace "nomad-ops" {
   policy = "write"
 }
@@ -181,7 +182,7 @@ node {
 EOF
 
   # Apply the policy (idempotent)
-  NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-policy /etc/nomad.d/nomad-ops-policy.hcl
+  NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-policy /opt/nomad/policies/nomad-ops-policy.hcl
 
   # Create a token for nomad-ops (idempotent: check if already created)
   if [ ! -f /etc/nomad.d/nomad-ops-token ]; then
