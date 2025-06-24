@@ -67,8 +67,8 @@ job "nomad-ops" {
 
         # Adjust accordingly
         NOMAD_ADDR = "http://${NOMAD_IP_http}:4646"
-        # comment and provide a NOMAD_TOKEN instead
-        NOMAD_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/nomad_token"
+        # Use the host-provided token file
+        NOMAD_TOKEN_FILE = "/etc/nomad.d/nomad_token"
 
         TRACE = "FALSE"
       }
@@ -91,6 +91,12 @@ job "nomad-ops" {
             type = "volume"
             target = "/data"
             source = "nomad-ops-data"
+          },
+          {
+            type = "bind"
+            source = "/etc/nomad.d/nomad_token"
+            target = "/etc/nomad.d/nomad_token"
+            readonly = true
           }
         ]
       }

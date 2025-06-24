@@ -73,6 +73,13 @@ configure_nomad() {
 log_level = "$LOG_LEVEL"
 data_dir = "$DATA_DIR"
 
+acl {
+  enabled    = true
+  token_ttl  = "30s"
+  policy_ttl = "60s"
+  role_ttl   = "60s"
+}
+
 server {
   enabled = true
   bootstrap_expect = 1
@@ -132,6 +139,64 @@ wait_for_nomad() {
   exit 1
 }
 
+# Function to automate Nomad ACL setup for nomad-ops
+setup_nomad_acl() {
+  echo "Setting up Nomad ACLs and tokens for nomad-ops..."
+
+  # Ensure jq is installed for JSON parsing
+  if ! command -v jq &> /dev/null; then
+    if command -v apt-get &> /dev/null; then
+      apt-get update -y && apt-get install -y jq
+    elif command -v yum &> /dev/null; then
+      yum install -y jq
+    elif command -v dnf &> /dev/null; then
+      dnf install -y jq
+    else
+      echo "Please install jq manually."
+      exit 1
+    fi
+  fi
+
+  # Wait for Nomad to be ready
+  wait_for_nomad
+
+  # Bootstrap ACL system if not already done
+  if [ ! -f /etc/nomad.d/nomad-bootstrap-token ]; then
+    nomad acl bootstrap -json > /etc/nomad.d/nomad-bootstrap-token
+  fi
+
+  MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
+
+  # Create the nomad-ops namespace (idempotent)
+  NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply nomad-ops
+
+  # Write the ACL policy definition
+  cat > /etc/nomad.d/nomad-ops-policy.hcl <<EOF
+namespace "nomad-ops" {
+  policy = "write"
+}
+node {
+  policy = "read"
+}
+EOF
+
+  # Apply the policy (idempotent)
+  NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-policy /etc/nomad.d/nomad-ops-policy.hcl
+
+  # Create a token for nomad-ops (idempotent: check if already created)
+  if [ ! -f /etc/nomad.d/nomad-ops-token ]; then
+    NOMAD_TOKEN=$MGMT_TOKEN nomad acl token create -name="nomad-ops" -policy="nomad-ops-policy" -json > /etc/nomad.d/nomad-ops-token
+  fi
+  NOMAD_OPS_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-ops-token)
+
+  # Write the token to the expected location for the job
+  echo "$NOMAD_OPS_TOKEN" > /etc/nomad.d/nomad_token
+  chmod 600 /etc/nomad.d/nomad_token
+  chown nomad:nomad /etc/nomad.d/nomad_token
+
+  echo "Nomad ACL setup for nomad-ops complete."
+}
+
 # Function to install nomad-ops from source and deploy via Nomad job
 install_nomad_ops() {
   echo "Installing nomad-ops from source..."
@@ -160,9 +225,6 @@ install_nomad_ops() {
 
   # Wait for Nomad to be ready
   wait_for_nomad
-
-  # Ensure Nomad namespace exists
-  nomad namespace apply nomad-ops
 
   # Deploy nomad-ops job
   nomad job run .deployment/nomad/docker.hcl
@@ -222,6 +284,9 @@ EOF
 
   echo "Nomad setup complete."
 fi
+
+# Setup Nomad ACLs and tokens for nomad-ops
+setup_nomad_acl
 
 # Install nomad-ops
 install_nomad_ops
