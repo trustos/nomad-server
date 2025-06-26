@@ -232,7 +232,7 @@ install_nomad_ops() {
 
   # Deploy nomad-ops job
   export NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token)
-  envsubst < /opt/nomad-ops/nomad-ops/job/nomad-ops.nomad.hcl > /tmp/nomad-ops.nomad.hcl
+  envsubst '${NOMAD_TOKEN}' < /opt/nomad-ops/nomad-ops/job/nomad-ops.nomad.hcl > /tmp/nomad-ops.nomad.hcl
   nomad job run /tmp/nomad-ops.nomad.hcl
 
   echo "nomad-ops deployment via Nomad job complete."
