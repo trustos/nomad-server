@@ -307,6 +307,9 @@ fi
 # Setup Nomad ACLs and tokens for nomad-ops
 setup_nomad_acl
 
+# Ensure the nomad-ops namespace exists before creating volumes or jobs in it
+NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad namespace apply nomad-ops
+
 # Create the nomad-ops-data volume required by the job
 if [ -f "/opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl" ]; then
   NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create -namespace=nomad-ops /opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl
