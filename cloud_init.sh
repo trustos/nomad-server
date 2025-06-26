@@ -192,14 +192,12 @@ setup_nomad_acl() {
 
   MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
 
-  # Apply the superuser policy from the repo
+  # Apply the superuser policy from the repo using the management token
   POLICY_PATH="/opt/nomad-ops/jobs/nomad-ops/acl.hcl"
   NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-superuser "$POLICY_PATH"
 
-  # Create a token for nomad-ops (idempotent: check if already created)
-  if [ ! -f /etc/nomad.d/nomad-ops-token ]; then
-    NOMAD_TOKEN=$MGMT_TOKEN nomad acl token create -name="nomad-ops" -policy="nomad-ops-superuser" -json > /etc/nomad.d/nomad-ops-token
-  fi
+  # Always create a new token for nomad-ops using the management token
+  NOMAD_TOKEN=$MGMT_TOKEN nomad acl token create -name="nomad-ops" -policy="nomad-ops-superuser" -json > /etc/nomad.d/nomad-ops-token
   NOMAD_OPS_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-ops-token)
 
   # Write the token to the expected location for the job (no newline)
