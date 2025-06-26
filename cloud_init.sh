@@ -308,7 +308,8 @@ fi
 setup_nomad_acl
 
 # Ensure the nomad-ops namespace exists before creating volumes or jobs in it
-NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad namespace apply nomad-ops
+MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
+NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply nomad-ops
 
 # Create the nomad-ops-data volume required by the job
 if [ -f "/opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl" ]; then
