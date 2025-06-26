@@ -193,7 +193,7 @@ setup_nomad_acl() {
   MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
 
   # Apply the superuser policy from the repo using the management token
-  POLICY_PATH="/opt/nomad-ops/jobs/nomad-ops/acl.hcl"
+  POLICY_PATH="/opt/nomad-ops/nomad-ops/acl/acl.hcl"
   NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-superuser "$POLICY_PATH"
 
   # Always create a new token for nomad-ops using the management token
@@ -232,7 +232,7 @@ install_nomad_ops() {
 
   # Deploy nomad-ops job
   NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token)
-  NOMAD_TOKEN=$NOMAD_TOKEN nomad job run /opt/nomad-ops/jobs/nomad-ops/nomad-ops.nomad.hcl
+  NOMAD_TOKEN=$NOMAD_TOKEN nomad job run /opt/nomad-ops/nomad-ops/job/nomad-ops.nomad.hcl
 
   echo "nomad-ops deployment via Nomad job complete."
 }
@@ -306,16 +306,11 @@ fi
 # Setup Nomad ACLs and tokens for nomad-ops
 setup_nomad_acl
 
-
-
-# NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-policy /opt/nomad/policies/nomad-ops-policy.hcl
-# NOMAD_TOKEN=$MGMT_TOKEN nomad acl token create -name="nomad-ops" -policy="nomad-ops-policy"
-
 # Create the nomad-ops-data volume required by the job
-if [ -f "/opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl" ]; then
-  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create -namespace=nomad-ops /opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl
+if [ -f "/opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl" ]; then
+  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create -namespace=nomad-ops /opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl
 else
-  echo "WARNING: /opt/nomad-ops/jobs/nomad-ops/nomad-ops.volume.hcl not found. Skipping volume creation."
+  echo "WARNING: /opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl not found. Skipping volume creation."
 fi
 
 # Install nomad-ops
