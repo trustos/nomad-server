@@ -23,7 +23,7 @@ job "pocketbase" {
           driver = "docker"
 
           config {
-              image = "ghcr.io/trustos/pocketbase:0.28.4"
+              image = "ghcr.io/trustos/pocketbase:0.28.3"
               ports = ["http"]
           }
 
