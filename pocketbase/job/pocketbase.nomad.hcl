@@ -1,4 +1,5 @@
 job "pocketbase" {
+  namespace = "default"
   datacenters = ["dc1"]
 
   group "pocketbase" {
