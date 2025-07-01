@@ -7,11 +7,11 @@ http:
 
   routers:
     dashboard:
-      rule: "Host(`traefik.local.test`)"
+      rule: "Host(`traefik.local`)"
       entryPoints:
         - "https"
       service: api@internal
       middlewares:
         - "auth"
       tls:
-        certResolver: "myresolver"
+        certResolver: "nomadcertresolver"
