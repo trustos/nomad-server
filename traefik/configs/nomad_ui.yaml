@@ -3,7 +3,7 @@ http:
     auth:
       basicAuth:
         users:
-          - "$apr1$kLt1pTnQ$ak2k1hFphBsEqx0Vep1aY1"
+          - "admin:$apr1$kLt1pTnQ$ak2k1hFphBsEqx0Vep1aY1"
 
   routers:
     dashboard:
