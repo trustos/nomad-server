@@ -1,4 +1,6 @@
 job "traefik" {
+  namespace = "traefik"
+
   datacenters = ["dc1"]
 
   group "traefik" {
