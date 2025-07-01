@@ -1,0 +1,17 @@
+http:
+  middlewares:
+    auth:
+      basicAuth:
+        users:
+          - "$apr1$kLt1pTnQ$ak2k1hFphBsEqx0Vep1aY1"
+
+  routers:
+    dashboard:
+      rule: "Host(`traefik.local`)"
+      entryPoints:
+        - "https"
+      service: api@internal
+      middlewares:
+        - "auth"
+      tls:
+        certResolver: "nomadcertresolver"
