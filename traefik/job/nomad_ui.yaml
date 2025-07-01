@@ -1,0 +1,17 @@
+http:
+  middlewares:
+    auth:
+      basicAuth:
+        users:
+          - '{{ env "BASIC_AUTH_HASH" }}'
+
+  routers:
+    dashboard:
+      rule: "Host(`traefik.local.test`)"
+      entryPoints:
+        - "https"
+      service: api@internal
+      middlewares:
+        - "auth"
+      tls:
+        certResolver: "myresolver"

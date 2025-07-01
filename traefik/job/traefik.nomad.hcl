@@ -8,6 +8,9 @@ job "traefik" {
       port "web" {
         static = 80
       }
+      port "https" {
+        static = 443
+      }
     }
 
     task "traefik" {
@@ -18,18 +21,26 @@ job "traefik" {
       }
 
       config {
-        image = "traefik:v3.0"
-        ports = ["web"]
-        volumes = [
-          "local/traefik.toml:/etc/traefik/traefik.toml",
-          "local/dynamic:/etc/traefik/dynamic"
-        ]
+        image = "traefik:v3.4.3"
+        ports = ["web", "https"]
       }
 
       template {
-        source      = "local/nomad_ui.yml.tpl"
-        destination = "local/dynamic/nomad_ui.yml"
+        source      = "traefik.yaml"
+        destination = "local/traefik.yaml"
         change_mode = "restart"
+      }
+
+      template {
+        source      = "nomad_ui.yaml"
+        destination = "local/dynamic/nomad_ui.yaml"
+        change_mode = "restart"
+      }
+
+      volume_mount {
+        volume      = "local"
+        destination = "/etc/traefik"
+        read_only   = false
       }
 
       resources {
@@ -40,7 +51,9 @@ job "traefik" {
 
     volume "local" {
       type   = "host"
-      source = "traefik-config"
+      source = "traefik-data-vol"
+      read_only = false
+      sticky = true
     }
   }
 }
