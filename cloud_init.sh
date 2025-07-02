@@ -246,7 +246,7 @@ setup_traefik() {
     NAMESPACE="traefik"
     if ! NOMAD_TOKEN=$MGMT_TOKEN nomad namespace status -namespace=$NAMESPACE &>/dev/null; then
         echo "Creating Traefik namespace..."
-        NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply -namespace=$NAMESPACE
+        NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply -description "Traefik reverse proxy namespace." $NAMESPACE
     else
         echo "Traefik namespace already exists."
     fi
