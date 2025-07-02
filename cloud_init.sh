@@ -193,7 +193,7 @@ setup_nomad_acl() {
   MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
 
   # Apply the superuser policy from the repo using the management token
-  POLICY_PATH="/opt/nomad-ops/nomad-ops/acl/acl.hcl"
+  POLICY_PATH="/opt/nomad-server/nomad-ops/acl/acl.hcl"
   NOMAD_TOKEN=$MGMT_TOKEN nomad acl policy apply nomad-ops-superuser "$POLICY_PATH"
 
   # Always create a new token for nomad-ops using the management token
@@ -232,10 +232,32 @@ install_nomad_ops() {
 
   # Deploy nomad-ops job
   export NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token)
-  envsubst '${NOMAD_TOKEN}' < /opt/nomad-ops/nomad-ops/job/nomad-ops.nomad.hcl > /tmp/nomad-ops.nomad.hcl
+  envsubst '${NOMAD_TOKEN}' < /opt/nomad-server/nomad-ops/job/nomad-ops.nomad.hcl > /tmp/nomad-ops.nomad.hcl
   nomad job run /tmp/nomad-ops.nomad.hcl
 
   echo "nomad-ops deployment via Nomad job complete."
+}
+
+setup_traefik() {
+    # Configure credentials and execute command to create the Traefik Volume
+    MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
+
+    # Create the Traefik volume if it doesn't already exist
+    VOLUME_DEFINITION_PATH="/opt/nomad-server/traefik/volume/traefik.volume.hcl"
+    NOMAD_TOKEN=$MGMT_TOKEN nomad volume create -namespace=traefik $VOLUME_DEFINITION_PATH
+
+    # Calculate the volume ID and path
+    VOLUME_ID=$(NOMAD_TOKEN=$NOMAD_TOKEN nomad volume status -namespace=$NAMESPACE -json | jq -r .[0].ID)
+    VOLUME_PATH="/opt/nomad/host_volumes/$VOLUME_ID"
+
+    # copy the configs to the volume path
+    cp -r /opt/nomad-server/traefik/config/. $VOLUME_PATH
+
+    # Now run the Traefik job
+    echo "Running Traefik job..."
+
+    NOMAD_TOKEN=$MGMT_TOKEN nomad job run -namespace=traefik /opt/nomad-server/traefik/job/traefik.nomad.hcl
+    echo "Traefik job started."
 }
 
 # Setting up Docker if not already installed
@@ -300,8 +322,8 @@ EOF
 fi
 
 # Clone nomad-ops repo if not already present
-if [ ! -d "/opt/nomad-ops" ]; then
-  git clone https://github.com/trustos/nomad-server.git /opt/nomad-ops
+if [ ! -d "/opt/nomad-server" ]; then
+  git clone https://github.com/trustos/nomad-server.git /opt/nomad-server
 fi
 
 # Setup Nomad ACLs and tokens for nomad-ops
@@ -312,13 +334,20 @@ MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
 NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply nomad-ops
 
 # Create the nomad-ops-data volume required by the job
-if [ -f "/opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl" ]; then
-  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create -namespace=nomad-ops /opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl
+if [ -f "/opt/nomad-server/nomad-ops/volume/nomad-ops.volume.hcl" ]; then
+  NOMAD_TOKEN=$(cat /etc/nomad.d/nomad_token) nomad volume create -namespace=nomad-ops /opt/nomad-server/nomad-ops/volume/nomad-ops.volume.hcl
 else
-  echo "WARNING: /opt/nomad-ops/nomad-ops/volume/nomad-ops.volume.hcl not found. Skipping volume creation."
+  echo "WARNING: /opt/nomad-server/nomad-ops/volume/nomad-ops.volume.hcl not found. Skipping volume creation."
 fi
 
 # Install nomad-ops
 install_nomad_ops
+
+# Setup Traefik
+if [ -d "/opt/nomad-server/traefik" ]; then
+  setup_traefik
+else
+  echo "WARNING: /opt/nomad-server/traefik directory not found. Skipping Traefik setup."
+fi
 
 exit 0
