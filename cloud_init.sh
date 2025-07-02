@@ -260,7 +260,7 @@ setup_traefik() {
     VOLUME_PATH="/opt/nomad/host_volumes/$VOLUME_ID"
 
     # copy the configs to the volume path
-    cp -r /opt/nomad-server/traefik/config/. $VOLUME_PATH
+    cp -r /opt/nomad-server/traefik/configs/. $VOLUME_PATH
 
     # Now run the Traefik job
     echo "Running Traefik job..."
