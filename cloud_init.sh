@@ -242,6 +242,15 @@ setup_traefik() {
     # Configure credentials and execute command to create the Traefik Volume
     MGMT_TOKEN=$(jq -r .SecretID /etc/nomad.d/nomad-bootstrap-token)
 
+    # Create the Traefik namespace if it doesn't already exist
+    NAMESPACE="traefik"
+    if ! NOMAD_TOKEN=$MGMT_TOKEN nomad namespace status -namespace=$NAMESPACE &>/dev/null; then
+        echo "Creating Traefik namespace..."
+        NOMAD_TOKEN=$MGMT_TOKEN nomad namespace apply -namespace=$NAMESPACE
+    else
+        echo "Traefik namespace already exists."
+    fi
+
     # Create the Traefik volume if it doesn't already exist
     VOLUME_DEFINITION_PATH="/opt/nomad-server/traefik/volume/traefik.volume.hcl"
     NOMAD_TOKEN=$MGMT_TOKEN nomad volume create -namespace=traefik $VOLUME_DEFINITION_PATH
