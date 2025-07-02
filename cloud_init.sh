@@ -266,6 +266,7 @@ setup_traefik() {
     echo "Running Traefik job..."
 
     NOMAD_TOKEN=$MGMT_TOKEN nomad job run -namespace=traefik /opt/nomad-server/traefik/job/traefik.nomad.hcl
+    NOMAD_TOKEN=$MGMT_TOKEN nomad job restart -namespace=traefik traefik
     echo "Traefik job started."
 }
 
