@@ -1,5 +1,5 @@
 entryPoints:
-  web:
+  http:
     address: ":80"
   https:
     address: ":443"

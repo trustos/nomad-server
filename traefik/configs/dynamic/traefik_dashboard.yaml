@@ -9,9 +9,7 @@ http:
     dashboard:
       rule: "Host(`traefik.local`)"
       entryPoints:
-        - "https"
+        - "http"
       service: api@internal
       middlewares:
         - "auth"
-      tls:
-        certResolver: "nomadcertresolver"
