@@ -9,7 +9,7 @@ http:
     dashboard:
       rule: "Host(`traefik.local`)"
       entryPoints:
-        - "http"
+        - "web"
       service: api@internal
       middlewares:
         - "auth"

@@ -7,16 +7,8 @@ job "pocketbase" {
 
       network {
           port "http" {
-              static = 8090
+             to = 8090
           }
-      }
-
-      volume "pocketbase_data" {
-          type      = "host"
-          source      = "pocketbase-data-vol"
-          read_only   = false
-          # You might want to add sticky = true here for persistent data with single allocations
-          sticky      = true
       }
 
       task "pocketbase" {
@@ -25,11 +17,14 @@ job "pocketbase" {
           config {
               image = "ghcr.io/trustos/pocketbase:0.28.4"
               ports = ["http"]
-          }
-
-          volume_mount {
-              volume      = "pocketbase_data"
-              destination = "/pb/pb_data"
+              mounts = [
+                {
+                  type = "bind"
+                  source = "/mnt/glusterfs/pocketbase"
+                  target = "/pb/pb_data"
+                  readonly   = false
+                }
+              ]
           }
 
           resources {
