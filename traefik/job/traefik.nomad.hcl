@@ -5,6 +5,21 @@ job "traefik" {
   group "traefik" {
     count = 1
 
+    task "init-traefik-dir" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "mkdir"
+        args    = ["-p", "/mnt/glusterfs/traefik"]
+      }
+      resources {
+        cpu    = 50
+        memory = 32
+      }
+    }
+
     network {
       port "web" {
         static = 80
@@ -20,25 +35,20 @@ job "traefik" {
       config {
         image = "traefik:v3.4.3"
         ports = ["web", "https"]
-      }
-
-      volume_mount {
-        volume      = "local"
-        destination = "/etc/traefik"
-        read_only   = false
+        mounts = [
+          {
+            type        = "bind"
+            source      = "/mnt/glusterfs/traefik"
+            target      = "/etc/traefik"
+            readonly   = false
+          }
+        ]
       }
 
       resources {
         cpu    = 200
         memory = 128
       }
-    }
-
-    volume "local" {
-      type   = "host"
-      source = "traefik-data-vol"
-      read_only = false
-      sticky = true
     }
   }
 }
