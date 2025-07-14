@@ -19,4 +19,4 @@ certificatesResolvers:
       email: trustos@gmail.com
       storage: /etc/traefik/acme.json
       httpChallenge:
-        entryPoint: web
+        entryPoint: http
