@@ -9,15 +9,29 @@ job "nomad-ops" {
   # 30 second intervals.
   update {
     stagger      = "30s"
-    max_parallel = 1
+    max_parallel = 2
   }
 
   # A group defines a series of tasks that should be co-located
   # on the same client (host). All tasks within a group will be
   # placed on the same host.
   group "nomad-ops-group" {
-    # Only 1
-    count = 1
+    count = 2
+
+    task "init-nomad-ops-dir" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "mkdir"
+        args    = ["-p", "/mnt/glusterfs/nomad-ops"]
+      }
+      resources {
+        cpu    = 50
+        memory = 32
+      }
+    }
 
     network {
       # mode = "host"
@@ -87,9 +101,10 @@ job "nomad-ops" {
 
         mounts = [
           {
-            type = "volume"
+            type = "bind"
+            source = "/mnt/glusterfs/nomad-ops"
             target = "/data"
-            source = "nomad-ops-data"
+            readonly   = false
           }
         ]
       }

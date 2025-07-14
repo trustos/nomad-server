@@ -34,7 +34,7 @@ job "traefik" {
 
       config {
         image = "traefik:v3.4.3"
-        ports = ["web", "https"]
+        ports = ["http", "https"]
         mounts = [
           {
             type        = "bind"
