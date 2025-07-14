@@ -34,15 +34,21 @@ job "nomad-ops" {
     }
 
     network {
-      # mode = "host"
       port "http" {
-        static = 8080
+        to = 8080
       }
     }
 
     service {
       name = "nomad-ops"
-      tags = ["http","view","traefik.enable=true"]
+      tags = [
+        "http",
+        "view",
+        "traefik.enable=true",
+        "traefik.http.routers.nomadops.rule=Host(`nomadops.local`)",
+        "traefik.http.routers.nomadops.entrypoints=web",
+        "traefik.http.services.nomadops.loadbalancer.server.port=8080"
+      ]
 
       port = "http"
 
