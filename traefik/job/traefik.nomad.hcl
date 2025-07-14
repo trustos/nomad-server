@@ -3,7 +3,7 @@ job "traefik" {
   datacenters = ["dc1"]
 
   group "traefik" {
-    count = 1
+    count = 2
 
     task "init-traefik-dir" {
       driver = "raw_exec"
