@@ -21,7 +21,7 @@ job "traefik" {
     }
 
     network {
-      port "web" {
+      port "http" {
         static = 80
       }
       port "https" {
