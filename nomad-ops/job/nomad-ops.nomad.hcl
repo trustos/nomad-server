@@ -16,7 +16,7 @@ job "nomad-ops" {
   # on the same client (host). All tasks within a group will be
   # placed on the same host.
   group "nomad-ops-group" {
-    count = 2
+    count = 1
 
     task "init-nomad-ops-dir" {
       driver = "raw_exec"
@@ -45,9 +45,9 @@ job "nomad-ops" {
         "http",
         "view",
         "traefik.enable=true",
-        "traefik.http.routers.nomadops.rule=Host(`nomadops.local`)",
-        "traefik.http.routers.nomadops.entrypoints=web",
-        "traefik.http.services.nomadops.loadbalancer.server.port=8080"
+        "traefik.http.routers.nomadops-${NOMAD_ALLOC_ID}.rule=Host(`nomadops.local`)",
+        "traefik.http.routers.nomadops-${NOMAD_ALLOC_ID}.entrypoints=web",
+        "traefik.http.services.nomadops-${NOMAD_ALLOC_ID}.loadbalancer.server.port=8080"
       ]
 
       port = "http"
