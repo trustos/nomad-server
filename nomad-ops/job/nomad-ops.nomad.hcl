@@ -49,6 +49,8 @@ job "nomad-ops" {
         "traefik.http.routers.nomadops-local.entrypoints=web",
         "traefik.http.routers.nomadops-inet.rule=Host(`nomad-ops.rs-estates.com`)",
         "traefik.http.routers.nomadops-inet.entrypoints=web,websecure",
+        "traefik.http.routers.nomadops-inet.tls=true",
+        "traefik.http.routers.nomadops-inet.tls.certresolver=cert-stag",
       ]
 
       port = "http"

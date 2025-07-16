@@ -1,6 +1,11 @@
 entryPoints:
   web:
     address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
   websecure:
     address: ":443"
 
@@ -14,9 +19,15 @@ providers:
     watch: true
 
 certificatesResolvers:
-  nomadcertresolver:
+  cert-prod:
     acme:
       email: trustos@gmail.com
-      storage: /etc/traefik/acme.json
+      storage: /etc/traefik/acme-prod.json
+      httpChallenge:
+        entryPoint: web
+  cert-stag:
+    acme:
+      email: trustos@gmail.com
+      storage: /etc/traefik/acme-stag.json
       httpChallenge:
         entryPoint: web
