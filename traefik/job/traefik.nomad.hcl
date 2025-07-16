@@ -34,8 +34,18 @@ job "traefik" {
       }
     }
 
-    template {
-      data = <<EOF
+
+
+    task "traefik" {
+      driver = "docker"
+
+      env {
+        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
+        NLB_IP = "${NLB_IP}"
+      }
+
+      template {
+        data = <<EOF
 entryPoints:
   web:
     address: ":80"
@@ -55,6 +65,14 @@ providers:
   file:
     directory: "/etc/traefik/dynamic"
     watch: true
+  nomad:
+      endpoint:
+        address: "http://${NLB_IP}:4646"
+        token: "${TRAEFIK_TOKEN}"
+      watch: true
+      namespaces:
+        - "nomad-ops"
+        - "default"
 
 certificatesResolvers:
   cert-prod:
@@ -71,12 +89,9 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: web
 EOF
-      destination = "local/traefik.yaml"
-      change_mode = "restart"
-    }
-
-    task "traefik" {
-      driver = "docker"
+        destination = "local/traefik.yaml"
+        change_mode = "restart"
+      }
 
       config {
         image = "traefik:v3.4.3"
@@ -148,8 +163,18 @@ EOF
       }
     }
 
-    template {
-      data = <<EOF
+
+
+    task "traefik" {
+      driver = "docker"
+
+      env {
+        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
+        NLB_IP = "${NLB_IP}"
+      }
+
+      template {
+        data = <<EOF
 entryPoints:
   web:
     address: ":80"
@@ -169,13 +194,18 @@ providers:
   file:
     directory: "/etc/traefik/dynamic"
     watch: true
+  nomad:
+      endpoint:
+        address: "http://${NLB_IP}:4646"
+        token: "${TRAEFIK_TOKEN}"
+      watch: true
+      namespaces:
+        - "nomad-ops"
+        - "default"
 EOF
-      destination = "local/traefik.yaml"
-      change_mode = "restart"
-    }
-
-    task "traefik" {
-      driver = "docker"
+        destination = "local/traefik.yaml"
+        change_mode = "restart"
+      }
 
       config {
         image = "traefik:v3.4.3"
