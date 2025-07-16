@@ -29,5 +29,6 @@ certificatesResolvers:
     acme:
       email: trustos@gmail.com
       storage: /etc/traefik/acme-stag.json
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
       httpChallenge:
         entryPoint: web

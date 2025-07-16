@@ -5,6 +5,10 @@ job "traefik" {
   group "traefik" {
     count = 2
 
+    constraint {
+        distinct_hosts = true
+    }
+
     task "init-traefik-dir" {
       driver = "raw_exec"
       lifecycle {
