@@ -42,9 +42,21 @@ job "traefik" {
         mounts = [
           {
             type        = "bind"
-            source      = "/mnt/glusterfs/traefik"
-            target      = "/etc/traefik"
-            readonly   = false
+            source      = "/mnt/glusterfs/traefik/acme-stag.json"
+            target      = "/etc/traefik/acme-stag.json"
+            readonly    = false
+          },
+          {
+            type        = "bind"
+            source      = "/mnt/glusterfs/traefik/acme-prod.json"
+            target      = "/etc/traefik/acme-prod.json"
+            readonly    = false
+          },
+          {
+            type        = "bind"
+            source      = "/mnt/glusterfs/traefik/dynamic"
+            target      = "/etc/traefik/dynamic"
+            readonly    = false
           }
         ]
       }
