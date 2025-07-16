@@ -45,9 +45,10 @@ job "nomad-ops" {
         "http",
         "view",
         "traefik.enable=true",
-        "traefik.http.routers.nomadops-${NOMAD_ALLOC_ID}.rule=Host(`nomadops.local`)",
-        "traefik.http.routers.nomadops-${NOMAD_ALLOC_ID}.entrypoints=web",
-        "traefik.http.services.nomadops-${NOMAD_ALLOC_ID}.loadbalancer.server.port=8080"
+        "traefik.http.routers.nomadops-local.rule=Host(`nomadops.local`)",
+        "traefik.http.routers.nomadops-local.entrypoints=web",
+        "traefik.http.routers.nomadops-inet.rule=Host(`nomad-ops.rs-estates.com`)",
+        "traefik.http.routers.nomadops-inet.entrypoints=web,websecure",
       ]
 
       port = "http"
@@ -97,7 +98,7 @@ job "nomad-ops" {
         image = "ghcr.io/trustos/nomad-ops:latest"
         args = [
           "serve",
-          "--http", "0.0.0.0:${NOMAD_PORT_http}",
+          "--http", "0.0.0.0:8080",
           "--dir", "/data/pb_data"
         ]
 
