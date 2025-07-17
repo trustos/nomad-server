@@ -26,14 +26,19 @@ job "traefik" {
     }
 
     task "init-traefik-acme-files" {
-        driver = "raw_exec"
-        lifecycle { hook = "prestart" }
-        config {
-          command = "bash"
-          args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"]
-        }
-        resources { cpu = 10 memory = 10 }
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
       }
+      config {
+        command = "bash"
+        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"]
+      }
+      resources {
+        cpu = 10
+        memory = 10
+      }
+    }
 
     network {
       port "http" {
