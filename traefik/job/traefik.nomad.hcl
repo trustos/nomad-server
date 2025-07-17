@@ -32,7 +32,7 @@ job "traefik" {
       }
       config {
         command = "bash"
-        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"]
+        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 600 /mnt/glusterfs/traefik/acme-*.json"]
       }
       resources {
         cpu = 10
