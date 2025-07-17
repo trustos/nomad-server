@@ -67,6 +67,9 @@ entryPoints:
   websecure:
     address: ":443"
 
+log:
+  level: DEBUG
+
 api:
   dashboard: true
   insecure: false
@@ -173,8 +176,6 @@ EOF
       }
     }
 
-
-
     task "traefik" {
       driver = "docker"
 
@@ -190,6 +191,9 @@ entryPoints:
     address: ":80"
   websecure:
     address: ":443"
+
+log:
+  level: DEBUG
 
 api:
   dashboard: true
@@ -207,6 +211,21 @@ providers:
       namespaces:
         - "nomad-ops"
         - "default"
+
+certificatesResolvers:
+  cert-prod:
+    acme:
+      email: trustos@gmail.com
+      storage: /etc/traefik/acme-prod.json
+      httpChallenge:
+        entryPoint: web
+  cert-stag:
+    acme:
+      email: trustos@gmail.com
+      storage: /etc/traefik/acme-stag.json
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      httpChallenge:
+        entryPoint: web
 EOF
         destination = "local/traefik.yaml"
         change_mode = "restart"
