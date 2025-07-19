@@ -64,7 +64,8 @@ mkdir -p "$DYNAMIC_CONFIG_DIR"
 tail -F "$LOG_FILE" | \
 while read line; do
     if [[ "$line" =~ Retrieving\ the\ ACME\ challenge ]]; then
-        TOKEN=$(echo "$line" | grep -o 'token "[^"]*"' | cut -d'"' -f2)
+        # Extract token and domain from the log line
+        TOKEN=$(echo "$line" | grep -o 'token "[^"]*"' | awk -F'"' '{print $2}')
         DOMAIN=$(echo "$line" | grep -o 'for [^ ]*' | awk '{print $2}')
         CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$TOKEN.yaml"
         cat > "$CONFIG_FILE" <<YAML
@@ -83,7 +84,7 @@ http:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-        echo "Created dynamic route for ACME challenge: $CONFIG_FILE"
+        echo "Created dynamic route for ACME challenge: $CONFIG_FILE (domain: $DOMAIN, token: $TOKEN)"
     fi
 done
 EOF
