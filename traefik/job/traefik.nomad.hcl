@@ -93,9 +93,6 @@ EOF
         cpu = 10
         memory = 32
       }
-      lifecycle {
-        hook = "sidecar"
-      }
     }
 
     network {
