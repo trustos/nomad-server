@@ -53,6 +53,14 @@ INSTANCE_IP=$(hostname -I | awk '{print $1}')
 
 mkdir -p "$DYNAMIC_CONFIG_DIR"
 
+# Start cleanup loop in background to delete challenge routes older than 10 minutes
+(
+  while true; do
+    find "$DYNAMIC_CONFIG_DIR"/acme-challenge-*.yaml -type f -mmin +10 -delete
+    sleep 300 # Run every 5 minutes
+  done
+) &
+
 tail -F "$LOG_FILE" | \
 while read line; do
     if [[ "$line" =~ Retrieving\ the\ ACME\ challenge ]]; then
