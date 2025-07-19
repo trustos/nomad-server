@@ -132,10 +132,10 @@ api:
   insecure: false
 
 providers:
+  providersThrottleDuration: 1s
   file:
     directory: "/etc/traefik/dynamic"
     watch: true
-    providersThrottleDuration: 1s
   nomad:
       endpoint:
         address: "http://${NLB_IP}:4646"
