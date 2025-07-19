@@ -56,7 +56,7 @@ mkdir -p "$DYNAMIC_CONFIG_DIR"
 # Start cleanup loop in background to delete challenge routes older than 10 minutes
 (
   while true; do
-    find "$DYNAMIC_CONFIG_DIR"/acme-challenge-*.yaml -type f -mmin +10 -delete
+    find "$DYNAMIC_CONFIG_DIR"/acme-challenge-*.yaml -type f -mmin +10 -delete 2>/dev/null
     sleep 300 # Run every 5 minutes
   done
 ) &
