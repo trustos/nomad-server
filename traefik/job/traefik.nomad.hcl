@@ -42,6 +42,9 @@ job "traefik" {
     # Sidecar task: watches Traefik logs and generates dynamic ACME challenge routes
     task "acme-challenge-watcher" {
       driver = "raw_exec"
+      env {
+        MGMT_TOKEN = "${MGMT_TOKEN}"
+      }
       config {
         command = "bash"
         args = [
@@ -49,9 +52,33 @@ job "traefik" {
           <<EOF
 LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
+CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge.yaml"
+ACME_FILES="/mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"
 INSTANCE_IP=$(hostname -I | awk '{print $1}')
+NOMAD_ALLOC_ID="${NOMAD_ALLOC_ID}"
+MGMT_TOKEN="${MGMT_TOKEN}"
 
 mkdir -p "$DYNAMIC_CONFIG_DIR"
+
+# Function to extract IP from acme-challenge.yaml
+get_config_ip() {
+  grep 'url:' "$CONFIG_FILE" | awk -F'//' '{print $2}' | awk -F':' '{print $1}'
+}
+
+# Start ACME file watcher in background
+(
+  inotifywait -m -e close_write $ACME_FILES | while read path action file; do
+    echo "Detected change in $file"
+    CONFIG_IP=$(get_config_ip)
+    echo "Config IP: $CONFIG_IP, Instance IP: $INSTANCE_IP"
+    if [[ "$CONFIG_IP" != "$INSTANCE_IP" ]]; then
+      echo "Config IP does not match instance IP. Restarting allocation $NOMAD_ALLOC_ID..."
+      NOMAD_TOKEN="$MGMT_TOKEN" nomad alloc restart --namespace=traefik --task=traefik "$NOMAD_ALLOC_ID"
+    else
+      echo "Config IP matches instance IP. No restart needed."
+    fi
+  done
+) &
 
 # Start cleanup loop in background to delete challenge routes older than 10 minutes
 # No need for per-token cleanup with single route
@@ -65,7 +92,6 @@ while true; do
         # Extract token and domain from the log line
         TOKEN=$(echo "$line" | grep -o 'token "[^"]*"' | awk -F'"' '{print $2}')
         DOMAIN=$(echo "$line" | grep -o 'for [^ ]*' | awk '{print $2}')
-        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge.yaml"
         cat > "$CONFIG_FILE" <<YAML
 http:
   routers:
