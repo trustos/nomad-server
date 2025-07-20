@@ -85,13 +85,14 @@ while true; do
   if [ -p "$LOG_FILE" ]; then
     cat "$LOG_FILE" | while read line; do
       echo "LOG: $line" # Debug: print every line
-      if [[ "$line" =~ Retrieving\ the\ ACME\ challenge ]] || [[ "$line" =~ Trying\ to\ solve\ HTTP-01 ]]; then
+      if [[ "$line" =~ Retrieving\ the\ ACME\ challenge ]]; then
         echo "MATCHED: $line"
         # Extract token and domain from the log line
         TOKEN=$(echo "$line" | grep -o 'token "[^"]*"' | awk -F'"' '{print $2}')
         DOMAIN=$(echo "$line" | grep -o 'for [^ ]*' | awk '{print $2}')
-        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$TOKEN.yaml"
-        cat > "$CONFIG_FILE" <<YAML
+        if [ -n "$TOKEN" ]; then
+          CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$TOKEN.yaml"
+          cat > "$CONFIG_FILE" <<YAML
 http:
   routers:
     acme-challenge-$TOKEN:
@@ -107,7 +108,8 @@ http:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-        echo "Created dynamic route for ACME challenge: $CONFIG_FILE (domain: $DOMAIN, token: $TOKEN, ip: $INSTANCE_IP)"
+          echo "Created dynamic route for ACME challenge: $CONFIG_FILE (domain: $DOMAIN, token: $TOKEN, ip: $INSTANCE_IP)"
+        fi
       fi
     done
   else
