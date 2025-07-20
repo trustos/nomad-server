@@ -85,14 +85,12 @@ while true; do
   if [ -p "$LOG_FILE" ]; then
     cat "$LOG_FILE" | while read line; do
       echo "LOG: $line" # Debug: print every line
-      # Match lines that indicate a challenge for a domain
-      if [[ "$line" =~ Trying\ to\ solve\ HTTP-01 ]] || [[ "$line" =~ Retrieving\ the\ ACME\ challenge ]]; then
-        # Extract domain from log line (e.g. [nomad-ops.rs-estates.com])
-        DOMAIN=$(echo "$line" | grep -o '\[[^]]*\]' | sed 's/\[\(.*\)\]/\1/')
-        SAFE_DOMAIN=$(echo "$DOMAIN" | sed 's/\./-/g')
-        if [ -n "$DOMAIN" ]; then
-          CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
-          cat > "$CONFIG_FILE" <<YAML
+      # Match any log line with a domain in brackets
+      DOMAIN=$(echo "$line" | grep -o '\[[^]]*\]' | sed 's/\[\(.*\)\]/\1/')
+      SAFE_DOMAIN=$(echo "$DOMAIN" | sed 's/\./-/g')
+      if [ -n "$DOMAIN" ]; then
+        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
+        cat > "$CONFIG_FILE" <<YAML
 http:
   routers:
     acme-challenge-$SAFE_DOMAIN:
@@ -108,8 +106,7 @@ http:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-          echo "Created domain-based ACME challenge route: $CONFIG_FILE (domain: $DOMAIN, ip: $INSTANCE_IP)"
-        fi
+        echo "Created domain-based ACME challenge route: $CONFIG_FILE (domain: $DOMAIN, ip: $INSTANCE_IP)"
       fi
     done
   else
