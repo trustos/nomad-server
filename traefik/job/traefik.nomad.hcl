@@ -90,22 +90,22 @@ while true; do
         # Extract token and domain from the log line
         TOKEN=$(echo "$line" | grep -o 'token "[^"]*"' | awk -F'"' '{print $2}')
         DOMAIN=$(echo "$line" | grep -o 'for [^ ]*' | awk '{print $2}')
-        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$${TOKEN}.yaml"
+        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$TOKEN.yaml"
         cat > "$CONFIG_FILE" <<'YAML'
 http:
   routers:
-    acme-challenge-$${TOKEN}:
-      rule: "PathPrefix(`/.well-known/acme-challenge/$${TOKEN}`)"
-      service: acme-challenge-service-$${TOKEN}
+    acme-challenge-$TOKEN:
+      rule: "PathPrefix(`/.well-known/acme-challenge/$TOKEN`)"
+      service: acme-challenge-service-$TOKEN
       entryPoints:
         - web
       priority: 1000
 
   services:
-    acme-challenge-service-$${TOKEN}:
+    acme-challenge-service-$TOKEN:
       loadBalancer:
         servers:
-          - url: "http://$${INSTANCE_IP}:80"
+          - url: "http://$INSTANCE_IP:80"
 YAML
         echo "Created dynamic route for ACME challenge: $CONFIG_FILE (domain: $DOMAIN, token: $TOKEN, ip: $INSTANCE_IP)"
       fi
