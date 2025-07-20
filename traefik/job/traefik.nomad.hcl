@@ -85,8 +85,8 @@ while true; do
   if [ -p "$LOG_FILE" ]; then
     cat "$LOG_FILE" | while read line; do
       echo "LOG: $line" # Debug: print every line
-      # Match any log line with a domain in brackets
-      DOMAIN=$(echo "$line" | grep -o '\[[^]]*\]' | sed 's/\[\(.*\)\]/\1/')
+      # Only extract bracketed strings that look like domains (e.g. [something.domain.tld])
+      DOMAIN=$(echo "$line" | grep -o '\[[a-zA-Z0-9.-]*\.[a-zA-Z]*\]' | sed 's/\[\(.*\)\]/\1/')
       SAFE_DOMAIN=$(echo "$DOMAIN" | sed 's/\./-/g')
       if [ -n "$DOMAIN" ]; then
         CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
