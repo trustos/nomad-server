@@ -69,14 +69,7 @@ get_config_ip() {
 (
   inotifywait -m -e close_write $ACME_FILES | while read path action file; do
     echo "Detected change in $file"
-    CONFIG_IP=$(get_config_ip)
-    echo "Config IP: $CONFIG_IP, Instance IP: $INSTANCE_IP"
-    if [[ "$CONFIG_IP" != "$INSTANCE_IP" ]]; then
-      echo "Config IP does not match instance IP. Restarting allocation $NOMAD_ALLOC_ID..."
-      NOMAD_TOKEN="$MGMT_TOKEN" nomad alloc restart --namespace=traefik --task=traefik "$NOMAD_ALLOC_ID"
-    else
-      echo "Config IP matches instance IP. No restart needed."
-    fi
+    # Restart logic removed; Traefik will reload configs automatically
   done
 ) &
 
