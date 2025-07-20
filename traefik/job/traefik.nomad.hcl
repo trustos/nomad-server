@@ -96,7 +96,7 @@ while true; do
 http:
   routers:
     acme-challenge-$TOKEN:
-      rule: "PathPrefix(`/.well-known/acme-challenge/$TOKEN`)"
+      rule: "PathPrefix(\`/.well-known/acme-challenge/$TOKEN\`)"
       service: acme-challenge-service-$TOKEN
       entryPoints:
         - web
