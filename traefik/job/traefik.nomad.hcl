@@ -86,11 +86,11 @@ while true; do
     cat "$LOG_FILE" | while read line; do
       echo "LOG: $line" # Debug: print every line
       # Only extract bracketed strings that look like domains (e.g. [something.domain.tld])
-      for DOMAIN in $(echo "$line" | grep -o '\[[a-zA-Z0-9.-]*\.[a-zA-Z]*\]' | sed 's/\[\(.*\)\]/\1/'); do
-        SAFE_DOMAIN=$(echo "$DOMAIN" | sed 's/\./-/g')
-        if [ -n "$DOMAIN" ]; then
-          CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
-          cat > "$CONFIG_FILE" <<YAML
+      DOMAIN=$(echo "$line" | grep -o '\[[a-zA-Z0-9.-]*\.[a-zA-Z]*\]' | sed 's/\[\(.*\)\]/\1/')
+      SAFE_DOMAIN=$(echo "$DOMAIN" | sed 's/\./-/g')
+      if [ -n "$DOMAIN" ]; then
+        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
+        cat > "$CONFIG_FILE" <<YAML
 http:
   routers:
     acme-challenge-$SAFE_DOMAIN:
@@ -106,9 +106,8 @@ http:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-          echo "Created domain-based ACME challenge route: $CONFIG_FILE (domain: $DOMAIN, ip: $INSTANCE_IP)"
-        fi
-      done
+        echo "Created domain-based ACME challenge route: $CONFIG_FILE (domain: $DOMAIN, ip: $INSTANCE_IP)"
+      fi
     done
   else
     echo "FIFO $LOG_FILE not found, waiting..."
