@@ -73,10 +73,10 @@ get_config_ip() {
   done
 ) &
 
-# Start cleanup loop in background to delete challenge routes older than 10 minutes
+# Start cleanup loop in background to delete domain-based challenge routes older than 10 minutes
 (
   while true; do
-    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +10 -exec rm -f {} \;
+    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +1 -exec rm -f {} \;
     sleep 60
   done
 ) &
@@ -85,30 +85,30 @@ while true; do
   if [ -p "$LOG_FILE" ]; then
     cat "$LOG_FILE" | while read line; do
       echo "LOG: $line" # Debug: print every line
-      if [[ "$line" =~ Retrieving\ the\ ACME\ challenge ]]; then
-        echo "MATCHED: $line"
-        # Extract token and domain from the log line
-        TOKEN=$(echo "$line" | grep -o 'token "[^"]*"' | awk -F'"' '{print $2}')
-        DOMAIN=$(echo "$line" | grep -o 'for [^ ]*' | awk '{print $2}')
-        if [ -n "$TOKEN" ]; then
-          CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$TOKEN.yaml"
+      # Match lines that indicate a challenge for a domain
+      if [[ "$line" =~ Trying\ to\ solve\ HTTP-01 ]] || [[ "$line" =~ Retrieving\ the\ ACME\ challenge ]]; then
+        # Extract domain from log line (e.g. [nomad-ops.rs-estates.com])
+        DOMAIN=$(echo "$line" | grep -o '\[[^]]*\]' | sed 's/\[\(.*\)\]/\1/')
+        SAFE_DOMAIN=$(echo "$DOMAIN" | sed 's/\./-/g')
+        if [ -n "$DOMAIN" ]; then
+          CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
           cat > "$CONFIG_FILE" <<YAML
 http:
   routers:
-    acme-challenge-$TOKEN:
-      rule: "PathPrefix(\`/.well-known/acme-challenge/$TOKEN\`)"
-      service: acme-challenge-service-$TOKEN
+    acme-challenge-$SAFE_DOMAIN:
+      rule: "Host(\`$DOMAIN\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
+      service: acme-challenge-service-$SAFE_DOMAIN
       entryPoints:
         - web
       priority: 1000
 
   services:
-    acme-challenge-service-$TOKEN:
+    acme-challenge-service-$SAFE_DOMAIN:
       loadBalancer:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-          echo "Created dynamic route for ACME challenge: $CONFIG_FILE (domain: $DOMAIN, token: $TOKEN, ip: $INSTANCE_IP)"
+          echo "Created domain-based ACME challenge route: $CONFIG_FILE (domain: $DOMAIN, ip: $INSTANCE_IP)"
         fi
       fi
     done
