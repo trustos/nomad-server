@@ -81,7 +81,12 @@ get_config_ip() {
 ) &
 
 # Start cleanup loop in background to delete challenge routes older than 10 minutes
-# No need for per-token cleanup with single route
+(
+  while true; do
+    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +10 -exec rm -f {} \;
+    sleep 60
+  done
+) &
 
 while true; do
   if [ -p "$LOG_FILE" ]; then
@@ -92,23 +97,24 @@ while true; do
         # Extract token and domain from the log line
         TOKEN=$(echo "$line" | grep -o 'token "[^"]*"' | awk -F'"' '{print $2}')
         DOMAIN=$(echo "$line" | grep -o 'for [^ ]*' | awk '{print $2}')
+        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-${TOKEN}.yaml"
         cat > "$CONFIG_FILE" <<YAML
 http:
   routers:
-    acme-challenge:
-      rule: "PathPrefix(\`/.well-known/acme-challenge/\`)"
-      service: acme-challenge-service
+    acme-challenge-${TOKEN}:
+      rule: "PathPrefix(\`/.well-known/acme-challenge/${TOKEN}\`)"
+      service: acme-challenge-service-${TOKEN}
       entryPoints:
         - web
       priority: 1000
 
   services:
-    acme-challenge-service:
+    acme-challenge-service-${TOKEN}:
       loadBalancer:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-        echo "Updated dynamic route for ACME challenge: $CONFIG_FILE (domain: $DOMAIN, token: $TOKEN, ip: $INSTANCE_IP)"
+        echo "Created dynamic route for ACME challenge: $CONFIG_FILE (domain: $DOMAIN, token: $TOKEN, ip: $INSTANCE_IP)"
       fi
     done
   else
