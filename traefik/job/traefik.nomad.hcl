@@ -50,67 +50,57 @@ job "traefik" {
         args = [
           "-c",
           <<EOF
-LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
+#!/usr/bin/env bash
+
+LOG_FILE="\${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
-CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge.yaml"
 ACME_FILES="/mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"
-INSTANCE_IP=$(hostname -I | awk '{print $1}')
-NOMAD_ALLOC_ID="${NOMAD_ALLOC_ID}"
-MGMT_TOKEN="${MGMT_TOKEN}"
+INSTANCE_IP=\$(hostname -I | awk '{print \$1}')
 
-mkdir -p "$DYNAMIC_CONFIG_DIR"
+mkdir -p "\$DYNAMIC_CONFIG_DIR"
 
-# Function to extract IP from acme-challenge.yaml
-get_config_ip() {
-  grep 'url:' "$CONFIG_FILE" | awk -F'//' '{print $2}' | awk -F':' '{print $1}'
-}
-
-# Start ACME file watcher in background
 (
-  inotifywait -m -e close_write $ACME_FILES | while read path action file; do
-    echo "Detected change in $file"
-    # Restart logic removed; Traefik will reload configs automatically
+  inotifywait -m -e close_write \$ACME_FILES | while read path action file; do
+    echo "Detected change in \$file"
+    # No restart logic needed; Traefik reloads configs automatically
   done
 ) &
 
-# Start cleanup loop in background to delete domain-based challenge routes older than 10 minutes
 (
   while true; do
-    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +1 -exec rm -f {} \;
+    find "\$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +1 -exec rm -f {} \;
     sleep 60
   done
 ) &
 
 while true; do
-  if [ -p "$LOG_FILE" ]; then
-    cat "$LOG_FILE" | while read line; do
-      echo "LOG: $line" # Debug: print every line
-      # Only extract bracketed strings that look like domains (e.g. [something.domain.tld])
-      DOMAIN=$(echo "$line" | grep -o '\[[a-zA-Z0-9.-]*\.[a-zA-Z]*\]' | sed 's/\[\(.*\)\]/\1/')
-      SAFE_DOMAIN=$(echo "$DOMAIN" | sed 's/\./-/g')
-      if [ -n "$DOMAIN" ]; then
-        CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
-        cat > "$CONFIG_FILE" <<YAML
+  if [ -p "\$LOG_FILE" ]; then
+    cat "\$LOG_FILE" | while read -r line; do
+      echo "\$line" | grep -o '\[[a-zA-Z0-9.-]\+\.[a-zA-Z]\+\]' | sed 's/^\[\(.*\)\]$/\1/' | while read -r DOMAIN; do
+        [ -z "\$DOMAIN" ] && continue
+        SAFE_DOMAIN=\$(echo "\$DOMAIN" | tr '.' '-')
+        CONFIG_FILE="\$DYNAMIC_CONFIG_DIR/acme-challenge-\$SAFE_DOMAIN.yaml"
+        cat > "\$CONFIG_FILE" <<YAML
 http:
   routers:
-    acme-challenge-$SAFE_DOMAIN:
-      rule: "Host(\`$DOMAIN\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
-      service: acme-challenge-service-$SAFE_DOMAIN
+    acme-challenge-\$SAFE_DOMAIN:
+      rule: "Host(\`\$DOMAIN\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
+      service: acme-challenge-service-\$SAFE_DOMAIN
       entryPoints:
         - web
       priority: 1000
 
   services:
-    acme-challenge-service-$SAFE_DOMAIN:
+    acme-challenge-service-\$SAFE_DOMAIN:
       loadBalancer:
         servers:
-          - url: "http://$INSTANCE_IP:80"
+          - url: "http://\$INSTANCE_IP:80"
 YAML
-        echo "Created domain-based ACME challenge route: $CONFIG_FILE (domain: $DOMAIN, ip: $INSTANCE_IP)"
-      fi
+        echo "Created domain-based ACME challenge route: \$CONFIG_FILE (domain: \$DOMAIN, ip: \$INSTANCE_IP)"
+      done
     done
   else
-    echo "FIFO $LOG_FILE not found, waiting..."
+    echo "FIFO \$LOG_FILE not found, waiting..."
     sleep 2
   fi
 done
