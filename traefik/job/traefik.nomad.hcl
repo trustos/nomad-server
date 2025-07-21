@@ -52,6 +52,18 @@ job "traefik" {
           <<EOF
 #!/usr/bin/env bash
 
+log() {
+  local level="$1"
+  local source="$2"
+  local msg="$3"
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  echo -e "${timestamp} ${level} ${source} > ${msg}"
+}
+log_dbg() { log "DBG" "acme-challenge-watcher.sh:${BASH_LINENO[0]}" "$1"; }
+log_inf() { log "INF" "acme-challenge-watcher.sh:${BASH_LINENO[0]}" "$1"; }
+log_err() { log "ERR" "acme-challenge-watcher.sh:${BASH_LINENO[0]}" "$1"; }
+
 LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
 ACME_FILES="/mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"
@@ -61,7 +73,7 @@ mkdir -p "$DYNAMIC_CONFIG_DIR"
 
 (
   inotifywait -m -e close_write $ACME_FILES | while read path action file; do
-    echo "Detected change in $file"
+    log_dbg "Detected change in $file"
     # No restart logic needed; Traefik reloads configs automatically
   done
 ) &
@@ -96,11 +108,11 @@ http:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-        echo "Created domain-based ACME challenge route: $CONFIG_FILE (domain: $DOMAIN, ip: $INSTANCE_IP)"
+        log_dbg "Created domain-based ACME challenge route config_file=\"$CONFIG_FILE\" domain=\"$DOMAIN\" ip=\"$INSTANCE_IP\""
       done
     done
   else
-    echo "FIFO $LOG_FILE not found, waiting..."
+    log_dbg "FIFO $LOG_FILE not found, waiting..."
     sleep 2
   fi
 done
