@@ -58,13 +58,13 @@ log() {
   local msg="$3"
   local timestamp
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  echo -e "${timestamp} ${level} ${source} > ${msg}"
+  echo -e "$timestamp $level $source > $msg}"
 }
-log_dbg() { log "DBG" "acme-challenge-watcher.sh:${BASH_LINENO[0]}" "$1"; }
-log_inf() { log "INF" "acme-challenge-watcher.sh:${BASH_LINENO[0]}" "$1"; }
-log_err() { log "ERR" "acme-challenge-watcher.sh:${BASH_LINENO[0]}" "$1"; }
+log_dbg() { log "DBG" "acme-challenge-watcher.sh:$BASH_LINENO[0]" "$1"; }
+log_inf() { log "INF" "acme-challenge-watcher.sh:$BASH_LINENO[0]" "$1"; }
+log_err() { log "ERR" "acme-challenge-watcher.sh:$BASH_LINENO[0]" "$1"; }
 
-LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
+LOG_FILE="$NOMAD_ALLOC_DIR/logs/.traefik.stdout.fifo"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
 ACME_FILES="/mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"
 INSTANCE_IP=$(hostname -I | awk '{print $1}')
