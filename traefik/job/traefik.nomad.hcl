@@ -64,18 +64,21 @@ log_dbg() { log "DBG" "acme-challenge-watcher.sh:$LINENO[0]" "$1"; }
 log_inf() { log "INF" "acme-challenge-watcher.sh:$LINENO[0]" "$1"; }
 log_err() { log "ERR" "acme-challenge-watcher.sh:$LINENO[0]" "$1"; }
 
-LOG_FILE="$NOMAD_ALLOC_DIR/logs/.traefik.stdout.fifo"
+LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
 ACME_FILES="/mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json"
 INSTANCE_IP=$(hostname -I | awk '{print $1}')
 
 mkdir -p "$DYNAMIC_CONFIG_DIR"
 
+# Improved inotifywait parsing and debounce
 (
   inotifywait -m -e close_write $ACME_FILES | while read -r line; do
-    file=$(echo "$line" | awk '{print $NF}')
-    log_dbg "Detected change in $file"
+    filename=$(echo "$line" | awk '{print $NF}')
+    log_dbg "Detected change in $filename (raw: $line)"
     # No restart logic needed; Traefik reloads configs automatically
+    # Touch a flag file to signal main loop
+    touch "$DYNAMIC_CONFIG_DIR/.acme_changed"
   done
 ) &
 
@@ -87,13 +90,15 @@ mkdir -p "$DYNAMIC_CONFIG_DIR"
 ) &
 
 while true; do
+  # Wait for either a log FIFO or an ACME file change signal
   if [ -p "$LOG_FILE" ]; then
     cat "$LOG_FILE" | while read -r line; do
       echo "$line" | grep -o '\[[a-zA-Z0-9.-]\+\.[a-zA-Z]\+\]' | sed 's/^\[\(.*\)\]$/\1/' | while read -r DOMAIN; do
         [ -z "$DOMAIN" ] && continue
         SAFE_DOMAIN=$(echo "$DOMAIN" | tr '.' '-')
         CONFIG_FILE="$DYNAMIC_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
-        cat > "$CONFIG_FILE" <<YAML
+        tmpfile=$(mktemp)
+        cat > "$tmpfile" <<YAML
 http:
   routers:
     acme-challenge-$SAFE_DOMAIN:
@@ -109,9 +114,19 @@ http:
         servers:
           - url: "http://$INSTANCE_IP:80"
 YAML
-        log_dbg "Created domain-based ACME challenge route config_file=\"$CONFIG_FILE\" domain=\"$DOMAIN\" ip=\"$INSTANCE_IP\""
+        if ! cmp -s "$tmpfile" "$CONFIG_FILE"; then
+          mv "$tmpfile" "$CONFIG_FILE"
+          log_dbg "Updated domain-based ACME challenge route config_file=\"$CONFIG_FILE\" domain=\"$DOMAIN\" ip=\"$INSTANCE_IP\""
+        else
+          rm "$tmpfile"
+          log_dbg "No change for config_file=\"$CONFIG_FILE\" domain=\"$DOMAIN\""
+        fi
       done
     done
+  elif [ -f "$DYNAMIC_CONFIG_DIR/.acme_changed" ]; then
+    # ACME file changed, but no log lines to process, just sleep briefly
+    sleep 1
+    rm -f "$DYNAMIC_CONFIG_DIR/.acme_changed"
   else
     log_dbg "FIFO $LOG_FILE not found, waiting..."
     sleep 2
