@@ -72,7 +72,8 @@ INSTANCE_IP=$(hostname -I | awk '{print $1}')
 mkdir -p "$DYNAMIC_CONFIG_DIR"
 
 (
-  inotifywait -m -e close_write $ACME_FILES | while read -r path action file; do
+  inotifywait -m -e close_write $ACME_FILES | while read -r line; do
+    file=$(echo "$line" | awk '{print $NF}')
     log_dbg "Detected change in $file"
     # No restart logic needed; Traefik reloads configs automatically
   done
