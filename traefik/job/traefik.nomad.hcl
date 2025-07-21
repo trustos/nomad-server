@@ -60,9 +60,9 @@ log() {
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   echo -e "$timestamp $level $source > $msg}"
 }
-log_dbg() { log "DBG" "acme-challenge-watcher.sh:$BASH_LINENO[0]" "$1"; }
-log_inf() { log "INF" "acme-challenge-watcher.sh:$BASH_LINENO[0]" "$1"; }
-log_err() { log "ERR" "acme-challenge-watcher.sh:$BASH_LINENO[0]" "$1"; }
+log_dbg() { log "DBG" "acme-challenge-watcher.sh:$LINENO[0]" "$1"; }
+log_inf() { log "INF" "acme-challenge-watcher.sh:$LINENO[0]" "$1"; }
+log_err() { log "ERR" "acme-challenge-watcher.sh:$LINENO[0]" "$1"; }
 
 LOG_FILE="$NOMAD_ALLOC_DIR/logs/.traefik.stdout.fifo"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
@@ -72,7 +72,7 @@ INSTANCE_IP=$(hostname -I | awk '{print $1}')
 mkdir -p "$DYNAMIC_CONFIG_DIR"
 
 (
-  inotifywait -m -e close_write $ACME_FILES | while read path action file; do
+  inotifywait -m -e close_write $ACME_FILES | while read -r path action file; do
     log_dbg "Detected change in $file"
     # No restart logic needed; Traefik reloads configs automatically
   done
