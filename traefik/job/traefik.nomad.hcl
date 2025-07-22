@@ -112,16 +112,18 @@ EOF
           <<EOF
 #!/usr/bin/env bash
 
-ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
-DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
-DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-route-debug.log"
+# --- Configurable Variables ---
+ACME_START_LOG="${ACME_START_LOG:-/mnt/glusterfs/traefik/acme-start.log}"
+DYNAMIC_CONFIG_DIR="${DYNAMIC_CONFIG_DIR:-/mnt/glusterfs/traefik/dynamic}"
+DEBUG_ROUTE_LOG="${DEBUG_ROUTE_LOG:-/mnt/glusterfs/traefik/acme-route-debug.log}"
+TTL_MINUTES="${TTL_MINUTES:-5}"
 
 touch "$DEBUG_ROUTE_LOG"
 
-# Cleanup old dynamic routes (older than 5 minutes)
+# Cleanup old dynamic routes (older than TTL_MINUTES)
 (
   while true; do
-    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +5 -exec rm -f {} \;
+    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +$TTL_MINUTES -exec rm -f {} \;
     sleep 60
   done
 ) &
@@ -141,11 +143,13 @@ while true; do
   [ -z "$ip" ] && echo "DEBUG: No IP found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
 
   safe_domain=$(echo "$domain" | tr '.' '-')
-  config_file="$DYNAMIC_CONFIG_DIR/acme-challenge-$safe_domain.yaml"
+  ROUTER_NAME="acme-challenge-$safe_domain"
+  SERVICE_NAME="acme-challenge-service-$safe_domain"
+  CONFIG_FILE="$DYNAMIC_CONFIG_DIR/$ROUTER_NAME.yaml"
 
   # Throttle: Only allow update if 5s have passed since last update of the YAML file
-  if [ -f "$config_file" ]; then
-    last_mod=$(stat -c %Y "$config_file")
+  if [ -f "$CONFIG_FILE" ]; then
+    last_mod=$(stat -c %Y "$CONFIG_FILE")
     now=$(date +%s)
     if [ $((now - last_mod)) -lt 5 ]; then
       echo "DEBUG: Throttling update for $domain, only $((now - last_mod))s since last update" >> "$DEBUG_ROUTE_LOG"
@@ -155,8 +159,8 @@ while true; do
 
   # Check if the config file exists and if the IP matches
   current_ip=""
-  if [ -f "$config_file" ]; then
-    current_ip=$(grep -m1 'url:' "$config_file" | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
+  if [ -f "$CONFIG_FILE" ]; then
+    current_ip=$(grep -m1 'url:' "$CONFIG_FILE" | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
   fi
 
   if [ "$ip" = "$current_ip" ]; then
@@ -165,25 +169,25 @@ while true; do
   fi
 
   # Write the dynamic route config (routes only ACME challenge path for the domain) atomically
-  tmpfile=$(mktemp)
-  cat > "$tmpfile" <<YAML
+  TMP_FILE=$(mktemp "${DYNAMIC_CONFIG_DIR}/.${ROUTER_NAME}.XXXXXX.yaml")
+  cat > "$TMP_FILE" <<YAML
 http:
   routers:
-    acme-challenge-$safe_domain:
-      rule: "Host(\`$domain\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
-      service: acme-challenge-service-$safe_domain
+    ${ROUTER_NAME}:
+      rule: "Host(\`${domain}\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
+      service: ${SERVICE_NAME}
       entryPoints:
         - web
         - websecure
       priority: 1000
 
   services:
-    acme-challenge-service-$safe_domain:
+    ${SERVICE_NAME}:
       loadBalancer:
         servers:
-          - url: "http://$ip:80"
+          - url: "http://${ip}:80"
 YAML
-  mv "$tmpfile" "$config_file"
+  mv "$TMP_FILE" "$CONFIG_FILE"
 
   echo "DEBUG: Updated dynamic route for $domain to $ip" >> "$DEBUG_ROUTE_LOG"
 done
