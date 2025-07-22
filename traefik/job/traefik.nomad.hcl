@@ -67,22 +67,30 @@ touch "$ACME_START_LOG"
 touch "$DEBUG_LOG"
 
 while true; do
-  if [ -p "$LOG_FILE" ]; then
-    while read -r line; do
-      echo "DEBUG: $line" >> "$DEBUG_LOG"
-      DOMAIN=$(echo "$line" | grep -oP 'Trying to challenge certificate for domain \[\K[a-zA-Z0-9.-]+(?=\])')
-      if [ -n "$DOMAIN" ]; then
-        echo "MATCHED: $DOMAIN" >> "$DEBUG_LOG"
-        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        (
-          flock -x 200
-          echo "$TIMESTAMP domain=$DOMAIN ip=$INSTANCE_IP" >> "$ACME_START_LOG"
-        ) 200>>"$ACME_START_LOG.lock"
-      fi
-    done < "$LOG_FILE"
-  else
+  # Wait for the FIFO to exist and be a pipe
+  if [ ! -p "$LOG_FILE" ]; then
+    echo "DEBUG: $LOG_FILE not found or not a pipe, sleeping..." >> "$DEBUG_LOG"
     sleep 2
+    continue
   fi
+
+  # Use cat to read from the FIFO, so the loop restarts if the writer disconnects
+  cat "$LOG_FILE" | while read -r line; do
+    echo "DEBUG: $line" >> "$DEBUG_LOG"
+    DOMAIN=$(echo "$line" | grep -oP 'Trying to challenge certificate for domain \[\K[a-zA-Z0-9.-]+(?=\])')
+    if [ -n "$DOMAIN" ]; then
+      echo "MATCHED: $DOMAIN" >> "$DEBUG_LOG"
+      TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      (
+        flock -x 200
+        echo "$TIMESTAMP domain=$DOMAIN ip=$INSTANCE_IP" >> "$ACME_START_LOG"
+      ) 200>>"$ACME_START_LOG.lock"
+    fi
+  done
+
+  # If cat exits (e.g., FIFO writer disconnects), loop and retry
+  echo "DEBUG: cat exited, retrying..." >> "$DEBUG_LOG"
+  sleep 1
 done
 EOF
         ]
