@@ -213,6 +213,7 @@ EOF
 entryPoints:
   web:
     address: ":80"
+    allowACMEByPass: true
   websecure:
     address: ":443"
 
@@ -242,13 +243,15 @@ certificatesResolvers:
     acme:
       email: trustos@gmail.com
       storage: /etc/traefik/acme-prod.json
-      tlsChallenge: {}
+      httpChallenge:
+        entryPoint: web
   cert-stag:
     acme:
       email: trustos@gmail.com
       storage: /etc/traefik/acme-stag.json
       caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
-      tlsChallenge: {}
+      httpChallenge:
+        entryPoint: web
 
 EOF
         destination = "local/traefik.yaml"
