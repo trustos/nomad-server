@@ -60,21 +60,19 @@ job "traefik" {
 
 LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
 ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
+DEBUG_LOG="/mnt/glusterfs/traefik/acme-debug.log"
 INSTANCE_IP=$(hostname -I | awk '{print $1}')
 
 touch "$ACME_START_LOG"
-
-strip_ansi() {
-  # Remove ANSI color codes
-  sed 's/\x1B\[[0-9;]*[JKmsu]//g'
-}
+touch "$DEBUG_LOG"
 
 while true; do
   if [ -p "$LOG_FILE" ]; then
     while read -r line; do
-      clean_line=$(echo "$line" | strip_ansi)
-      DOMAIN=$(echo "$clean_line" | grep -oP 'Trying to challenge certificate for domain \[\K[a-zA-Z0-9.-]+(?=\])')
+      echo "DEBUG: $line" >> "$DEBUG_LOG"
+      DOMAIN=$(echo "$line" | grep -oP 'Trying to challenge certificate for domain \[\K[a-zA-Z0-9.-]+(?=\])')
       if [ -n "$DOMAIN" ]; then
+        echo "MATCHED: $DOMAIN" >> "$DEBUG_LOG"
         TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         (
           flock -x 200
