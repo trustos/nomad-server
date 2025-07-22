@@ -48,6 +48,47 @@ job "traefik" {
       }
     }
 
+    # Sidecar task: logs ACME challenge starts to shared file
+    task "acme-challenge-log-watcher" {
+      driver = "raw_exec"
+      config {
+        command = "bash"
+        args = [
+          "-c",
+          <<EOF
+#!/usr/bin/env bash
+
+LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
+ACME_START_LOG="/mnt/glusterfs/traefik/acme-start"
+INSTANCE_IP=$(hostname -I | awk '{print $1}')
+
+touch "$ACME_START_LOG"
+
+while true; do
+  if [ -p "$LOG_FILE" ]; then
+    cat "$LOG_FILE" | while read -r line; do
+      if [[ "$line" =~ Trying\ to\ challenge\ certificate\ for\ domain\ \[([a-zA-Z0-9.-]+)\] ]]; then
+        DOMAIN="${BASH_REMATCH[1]}"
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        (
+          flock -x 200
+          echo "$TIMESTAMP domain=$DOMAIN ip=$INSTANCE_IP" >> "$ACME_START_LOG"
+        ) 200>>"$ACME_START_LOG.lock"
+      fi
+    done
+  else
+    sleep 2
+  fi
+done
+EOF
+        ]
+      }
+      resources {
+        cpu = 10
+        memory = 16
+      }
+    }
+
     task "traefik" {
       driver = "docker"
 
