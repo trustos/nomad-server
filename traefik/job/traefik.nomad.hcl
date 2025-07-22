@@ -117,6 +117,8 @@ DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
 DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-route-debug.log"
 
 mkdir -p "$DYNAMIC_CONFIG_DIR"
+THROTTLE_DIR="/tmp/acme-route-throttle"
+mkdir -p "$THROTTLE_DIR"
 touch "$DEBUG_ROUTE_LOG"
 
 while true; do
@@ -135,6 +137,19 @@ while true; do
 
   safe_domain=$(echo "$domain" | tr '.' '-')
   config_file="$DYNAMIC_CONFIG_DIR/acme-challenge-$safe_domain.yaml"
+
+  # Throttle: Only allow update if 5s have passed since last for this domain
+  throttle_file="$THROTTLE_DIR/$safe_domain.last"
+  now=$(date +%s)
+  last=0
+  if [ -f "$throttle_file" ]; then
+    last=$(cat "$throttle_file")
+  fi
+  if [ $((now - last)) -lt 5 ]; then
+    echo "DEBUG: Throttling update for $domain, only $((now - last))s since last update" >> "$DEBUG_ROUTE_LOG"
+    continue
+  fi
+  echo "$now" > "$throttle_file"
 
   # Check if the config file exists and if the IP matches
   current_ip=""
