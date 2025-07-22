@@ -66,16 +66,16 @@ touch "$ACME_START_LOG"
 
 while true; do
   if [ -p "$LOG_FILE" ]; then
-    cat "$LOG_FILE" | while read -r line; do
-      if [[ "$line" =~ Trying\ to\ challenge\ certificate\ for\ domain\ \[([a-zA-Z0-9.-]+)\] ]]; then
-        DOMAIN="${BASH_REMATCH[1]}"
+    while read -r line; do
+      DOMAIN=$(echo "$line" | awk '/Trying to challenge certificate for domain/ { match($0, /\[([a-zA-Z0-9.-]+)\]/, arr); print arr[1] }')
+      if [ -n "$DOMAIN" ]; then
         TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         (
           flock -x 200
           echo "$TIMESTAMP domain=$DOMAIN ip=$INSTANCE_IP" >> "$ACME_START_LOG"
         ) 200>>"$ACME_START_LOG.lock"
       fi
-    done
+    done < "$LOG_FILE"
   else
     sleep 2
   fi
