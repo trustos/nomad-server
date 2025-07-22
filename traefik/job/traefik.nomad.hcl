@@ -121,6 +121,14 @@ THROTTLE_DIR="/tmp/acme-route-throttle"
 mkdir -p "$THROTTLE_DIR"
 touch "$DEBUG_ROUTE_LOG"
 
+# Cleanup old dynamic routes (older than 5 minutes)
+(
+  while true; do
+    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +5 -exec rm -f {} \;
+    sleep 60
+  done
+) &
+
 while true; do
   inotifywait -e close_write "$ACME_START_LOG" >/dev/null 2>&1
 
