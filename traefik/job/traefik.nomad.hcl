@@ -116,20 +116,12 @@ ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
 DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-route-debug.log"
 
-THROTTLE_DIR="/tmp/acme-route-throttle"
-mkdir -p "$THROTTLE_DIR"
 touch "$DEBUG_ROUTE_LOG"
 
 # Cleanup old dynamic routes (older than 5 minutes)
 (
   while true; do
-    for file in $(find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +5); do
-      rm -f "$file"
-      # Also remove the corresponding throttle file
-      safe_domain=$(basename "$file" | sed 's/^acme-challenge-\(.*\)\.yaml$/\1/')
-      throttle_file="$THROTTLE_DIR/$safe_domain.last"
-      rm -f "$throttle_file"
-    done
+    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +5 -exec rm -f {} \;
     sleep 60
   done
 ) &
@@ -151,18 +143,15 @@ while true; do
   safe_domain=$(echo "$domain" | tr '.' '-')
   config_file="$DYNAMIC_CONFIG_DIR/acme-challenge-$safe_domain.yaml"
 
-  # Throttle: Only allow update if 5s have passed since last for this domain
-  throttle_file="$THROTTLE_DIR/$safe_domain.last"
-  now=$(date +%s)
-  last=0
-  if [ -f "$throttle_file" ]; then
-    last=$(cat "$throttle_file")
+  # Throttle: Only allow update if 5s have passed since last update of the YAML file
+  if [ -f "$config_file" ]; then
+    last_mod=$(stat -c %Y "$config_file")
+    now=$(date +%s)
+    if [ $((now - last_mod)) -lt 5 ]; then
+      echo "DEBUG: Throttling update for $domain, only $((now - last_mod))s since last update" >> "$DEBUG_ROUTE_LOG"
+      continue
+    fi
   fi
-  if [ $((now - last)) -lt 5 ]; then
-    echo "DEBUG: Throttling update for $domain, only $((now - last))s since last update" >> "$DEBUG_ROUTE_LOG"
-    continue
-  fi
-  echo "$now" > "$throttle_file"
 
   # Check if the config file exists and if the IP matches
   current_ip=""
