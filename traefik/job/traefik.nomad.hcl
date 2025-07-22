@@ -175,11 +175,10 @@ while true; do
 http:
   routers:
     acme-challenge-$safe_domain:
-      rule: "Host(\`$domain\`)"
+      rule: "Host(\`$domain\`) && PathPrefix("/.well-known/acme-challenge/")"
       service: acme-challenge-service-$safe_domain
       entryPoints:
         - web
-        - websecure
       priority: 1000
 
   services:
