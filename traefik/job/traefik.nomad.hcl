@@ -116,7 +116,6 @@ ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
 DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
 DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-route-debug.log"
 
-mkdir -p "$DYNAMIC_CONFIG_DIR"
 THROTTLE_DIR="/tmp/acme-route-throttle"
 mkdir -p "$THROTTLE_DIR"
 touch "$DEBUG_ROUTE_LOG"
@@ -124,7 +123,13 @@ touch "$DEBUG_ROUTE_LOG"
 # Cleanup old dynamic routes (older than 5 minutes)
 (
   while true; do
-    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +5 -exec rm -f {} \;
+    for file in $(find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +5); do
+      rm -f "$file"
+      # Also remove the corresponding throttle file
+      safe_domain=$(basename "$file" | sed 's/^acme-challenge-\(.*\)\.yaml$/\1/')
+      throttle_file="$THROTTLE_DIR/$safe_domain.last"
+      rm -f "$throttle_file"
+    done
     sleep 60
   done
 ) &
