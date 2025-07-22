@@ -96,82 +96,84 @@ EOF
         ]
       }
 
-      # Sidecar task: watches acme-start.log and creates dynamic routes for all requests to matched domain
-      task "acme-dynamic-route-watcher" {
-        driver = "raw_exec"
-        config {
-          command = "bash"
-          args = [
-            "-c",
-            <<EOF
-  #!/usr/bin/env bash
-
-  ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
-  DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
-  DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-route-debug.log"
-
-  touch "$DEBUG_ROUTE_LOG"
-
-  while true; do
-    inotifywait -e close_write "$ACME_START_LOG" >/dev/null 2>&1
-
-    # Get the last line (most recent event)
-    last_line=$(tail -n 1 "$ACME_START_LOG")
-    echo "DEBUG: Detected change, last_line: $last_line" >> "$DEBUG_ROUTE_LOG"
-
-    # Extract domain and ip
-    domain=$(echo "$last_line" | grep -oP 'domain=\K[^ ]+')
-    ip=$(echo "$last_line" | grep -oP 'ip=\K[^ ]+')
-
-    [ -z "$domain" ] && echo "DEBUG: No domain found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
-    [ -z "$ip" ] && echo "DEBUG: No IP found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
-
-    safe_domain=$(echo "$domain" | tr '.' '-')
-    config_file="$DYNAMIC_CONFIG_DIR/acme-challenge-$safe_domain.yaml"
-
-    # Check if the config file exists and if the IP matches
-    current_ip=""
-    if [ -f "$config_file" ]; then
-      current_ip=$(grep -m1 'url:' "$config_file" | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
-    fi
-
-    if [ "$ip" = "$current_ip" ]; then
-      echo "DEBUG: IP unchanged for $domain ($ip), skipping update" >> "$DEBUG_ROUTE_LOG"
-      continue
-    fi
-
-    # Write the dynamic route config (routes ALL requests for the domain)
-    cat > "$config_file" <<YAML
-  http:
-    routers:
-      acme-challenge-$safe_domain:
-        rule: "Host(\`$domain\`)"
-        service: acme-challenge-service-$safe_domain
-        entryPoints:
-          - web
-          - websecure
-        priority: 1000
-
-    services:
-      acme-challenge-service-$safe_domain:
-        loadBalancer:
-          servers:
-            - url: "http://$ip:80"
-  YAML
-
-    echo "DEBUG: Updated dynamic route for $domain to $ip" >> "$DEBUG_ROUTE_LOG"
-  done
-  EOF
-          ]
-        }
-        resources {
-          cpu = 10
-          memory = 32
-        }
-      }
       resources {
         cpu = 10
         memory = 16
+      }
+    }
+
+    # Sidecar task: watches acme-start.log and creates dynamic routes for all requests to matched domain
+    task "acme-dynamic-route-watcher" {
+      driver = "raw_exec"
+      config {
+        command = "bash"
+        args = [
+          "-c",
+          <<EOF
+#!/usr/bin/env bash
+
+ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
+DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
+DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-route-debug.log"
+
+mkdir -p "$DYNAMIC_CONFIG_DIR"
+touch "$DEBUG_ROUTE_LOG"
+
+while true; do
+  inotifywait -e close_write "$ACME_START_LOG" >/dev/null 2>&1
+
+  # Get the last line (most recent event)
+  last_line=$(tail -n 1 "$ACME_START_LOG")
+  echo "DEBUG: Detected change, last_line: $last_line" >> "$DEBUG_ROUTE_LOG"
+
+  # Extract domain and ip
+  domain=$(echo "$last_line" | grep -oP 'domain=\K[^ ]+')
+  ip=$(echo "$last_line" | grep -oP 'ip=\K[^ ]+')
+
+  [ -z "$domain" ] && echo "DEBUG: No domain found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
+  [ -z "$ip" ] && echo "DEBUG: No IP found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
+
+  safe_domain=$(echo "$domain" | tr '.' '-')
+  config_file="$DYNAMIC_CONFIG_DIR/acme-challenge-$safe_domain.yaml"
+
+  # Check if the config file exists and if the IP matches
+  current_ip=""
+  if [ -f "$config_file" ]; then
+    current_ip=$(grep -m1 'url:' "$config_file" | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
+  fi
+
+  if [ "$ip" = "$current_ip" ]; then
+    echo "DEBUG: IP unchanged for $domain ($ip), skipping update" >> "$DEBUG_ROUTE_LOG"
+    continue
+  fi
+
+  # Write the dynamic route config (routes ALL requests for the domain)
+  cat > "$config_file" <<YAML
+http:
+  routers:
+    acme-challenge-$safe_domain:
+      rule: "Host(\`$domain\`)"
+      service: acme-challenge-service-$safe_domain
+      entryPoints:
+        - web
+        - websecure
+      priority: 1000
+
+  services:
+    acme-challenge-service-$safe_domain:
+      loadBalancer:
+        servers:
+          - url: "http://$ip:80"
+YAML
+
+  echo "DEBUG: Updated dynamic route for $domain to $ip" >> "$DEBUG_ROUTE_LOG"
+done
+EOF
+        ]
+      }
+      resources {
+        cpu = 10
+        memory = 32
       }
     }
 
