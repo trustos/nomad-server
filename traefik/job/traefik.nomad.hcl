@@ -164,15 +164,17 @@ while true; do
     continue
   fi
 
-  # Write the dynamic route config (routes ALL requests for the domain)
-  cat > "$config_file" <<YAML
+  # Write the dynamic route config (routes only ACME challenge path for the domain) atomically
+  tmpfile=$(mktemp)
+  cat > "$tmpfile" <<YAML
 http:
   routers:
     acme-challenge-$safe_domain:
-      rule: "Host(\`$domain\`) && PathPrefix("/.well-known/acme-challenge/")"
+      rule: "Host(\`$domain\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
       service: acme-challenge-service-$safe_domain
       entryPoints:
         - web
+        - websecure
       priority: 1000
 
   services:
@@ -181,6 +183,7 @@ http:
         servers:
           - url: "http://$ip:80"
 YAML
+  mv "$tmpfile" "$config_file"
 
   echo "DEBUG: Updated dynamic route for $domain to $ip" >> "$DEBUG_ROUTE_LOG"
 done
