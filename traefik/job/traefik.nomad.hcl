@@ -50,8 +50,8 @@ job "traefik" {
         args    = ["-p", "/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"]
       }
       resources {
-        cpu    = 5
-        memory = 5
+        cpu    = 10
+        memory = 10
       }
     }
 
