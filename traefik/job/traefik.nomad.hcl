@@ -114,72 +114,76 @@ EOF
 #!/usr/bin/env bash
 
 ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
-PRIVATE_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic-private-\${NOMAD_ALLOC_INDEX:-\$(hostname)}"
+# Determine private config dir: use NOMAD_ALLOC_INDEX if set, else fallback to hostname
+if [ -n "${NOMAD_ALLOC_INDEX}" ]; then
+  PRIVATE_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"
+else
+  PRIVATE_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic-private-$(hostname)"
+fi
 DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-private-route-debug.log"
 THROTTLE_DIR="/tmp/acme-private-route-throttle"
 CONFIG_TTL_MINUTES=5
 
-mkdir -p "\$PRIVATE_CONFIG_DIR"
-mkdir -p "\$THROTTLE_DIR"
-touch "\$DEBUG_ROUTE_LOG"
+mkdir -p "$PRIVATE_CONFIG_DIR"
+mkdir -p "$THROTTLE_DIR"
+touch "$DEBUG_ROUTE_LOG"
 
-MY_IP=\$(hostname -I | awk '{print \$1}')
+MY_IP=$(hostname -I | awk '{print $1}')
 
-# Cleanup old configs (older than 5 minutes)
 (
   while true; do
-    find "\$PRIVATE_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +\$CONFIG_TTL_MINUTES -exec rm -f {} \;
+    find "$PRIVATE_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +$CONFIG_TTL_MINUTES -exec rm -f {} \;
     sleep 60
   done
 ) &
 
-tail -Fn0 "\$ACME_START_LOG" | while read -r line; do
-  echo "DEBUG: Read line: \$line" >> "\$DEBUG_ROUTE_LOG"
+tail -Fn0 "$ACME_START_LOG" | while read -r line; do
+  echo "DEBUG: Read line: $line" >> "$DEBUG_ROUTE_LOG"
 
-  DOMAIN=\$(echo "\$line" | grep -oP 'domain=\\K[^ ]+')
-  CHALLENGE_IP=\$(echo "\$line" | grep -oP 'ip=\\K[^ ]+')
+  DOMAIN=$(echo "$line" | grep -oP 'domain=\K[^ ]+')
+  CHALLENGE_IP=$(echo "$line" | grep -oP 'ip=\K[^ ]+')
 
-  [ -z "\$DOMAIN" ] && echo "DEBUG: No domain found, skipping" >> "\$DEBUG_ROUTE_LOG" && continue
-  [ -z "\$CHALLENGE_IP" ] && echo "DEBUG: No IP found, skipping" >> "\$DEBUG_ROUTE_LOG" && continue
+  [ -z "$DOMAIN" ] && echo "DEBUG: No domain found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
+  [ -z "$CHALLENGE_IP" ] && echo "DEBUG: No IP found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
 
-  if [ "\$CHALLENGE_IP" = "\$MY_IP" ]; then
-    echo "DEBUG: Challenge owner is self (\$MY_IP), skipping" >> "\$DEBUG_ROUTE_LOG"
+  if [ "$CHALLENGE_IP" = "$MY_IP" ]; then
+    echo "DEBUG: Challenge owner is self ($MY_IP), skipping" >> "$DEBUG_ROUTE_LOG"
     continue
   fi
 
-  SAFE_DOMAIN=\$(echo "\$DOMAIN" | tr '.' '-')
-  CONFIG_FILE="\$PRIVATE_CONFIG_DIR/acme-challenge-\$SAFE_DOMAIN.yaml"
-  THROTTLE_FILE="\$THROTTLE_DIR/\$SAFE_DOMAIN.last"
-  NOW=\$(date +%s)
+  SAFE_DOMAIN=$(echo "$DOMAIN" | tr '.' '-')
+  CONFIG_FILE="$PRIVATE_CONFIG_DIR/acme-challenge-$SAFE_DOMAIN.yaml"
+  THROTTLE_FILE="$THROTTLE_DIR/$SAFE_DOMAIN.last"
+  NOW=$(date +%s)
   LAST=0
-  if [ -f "\$THROTTLE_FILE" ]; then
-    LAST=\$(cat "\$THROTTLE_FILE")
+  if [ -f "$THROTTLE_FILE" ]; then
+    LAST=$(cat "$THROTTLE_FILE")
   fi
-  if [ \$((NOW - LAST)) -lt 5 ]; then
-    echo "DEBUG: Throttling update for \$DOMAIN, only \$((NOW - LAST))s since last update" >> "\$DEBUG_ROUTE_LOG"
+  if [ $((NOW - LAST)) -lt 5 ]; then
+    echo "DEBUG: Throttling update for $DOMAIN, only $((NOW - LAST))s since last update" >> "$DEBUG_ROUTE_LOG"
     continue
   fi
-  echo "\$NOW" > "\$THROTTLE_FILE"
+  echo "$NOW" > "$THROTTLE_FILE"
 
-  TMP_FILE="\${CONFIG_FILE}.tmp"
-  cat > "\$TMP_FILE" <<YAML
+  TMP_FILE="${CONFIG_FILE}.tmp"
+  cat > "$TMP_FILE" <<YAML
 http:
   routers:
-    acme-challenge-\$SAFE_DOMAIN:
-      rule: "Host(\`\$DOMAIN\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
-      service: acme-challenge-service-\$SAFE_DOMAIN
+    acme-challenge-$SAFE_DOMAIN:
+      rule: "Host(\\\`$DOMAIN\\\`) && PathPrefix(\\\`/.well-known/acme-challenge/\\\`)"
+      service: acme-challenge-service-$SAFE_DOMAIN
       entryPoints:
         - web
       priority: 1000
 
   services:
-    acme-challenge-service-\$SAFE_DOMAIN:
+    acme-challenge-service-$SAFE_DOMAIN:
       loadBalancer:
         servers:
-          - url: "http://\$CHALLENGE_IP:80"
+          - url: "http://$CHALLENGE_IP:80"
 YAML
-  mv "\$TMP_FILE" "\$CONFIG_FILE"
-  echo "DEBUG: Updated dynamic route for \$DOMAIN to \$CHALLENGE_IP in \$CONFIG_FILE" >> "\$DEBUG_ROUTE_LOG"
+  mv "$TMP_FILE" "$CONFIG_FILE"
+  echo "DEBUG: Updated dynamic route for $DOMAIN to $CHALLENGE_IP in $CONFIG_FILE" >> "$DEBUG_ROUTE_LOG"
 done
 EOF
         ]
