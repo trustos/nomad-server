@@ -102,8 +102,9 @@ EOF
       }
     }
 
-    # Sidecar task: watches acme-start.log and creates dynamic routes for all requests to matched domain
-    task "acme-dynamic-route-watcher" {
+    # Sidecar task: watches acme-start.log and creates dynamic routes for all requests to matched domain,
+    # but now writes only to the private dynamic config directory for this instance.
+    task "acme-private-dynamic-watcher" {
       driver = "raw_exec"
       config {
         command = "bash"
@@ -113,81 +114,72 @@ EOF
 #!/usr/bin/env bash
 
 ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
-DYNAMIC_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic"
-DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-route-debug.log"
+PRIVATE_CONFIG_DIR="/mnt/glusterfs/traefik/dynamic-private-\${NOMAD_ALLOC_INDEX:-\$(hostname)}"
+DEBUG_ROUTE_LOG="/mnt/glusterfs/traefik/acme-private-route-debug.log"
+THROTTLE_DIR="/tmp/acme-private-route-throttle"
+CONFIG_TTL_MINUTES=5
 
-THROTTLE_DIR="/tmp/acme-route-throttle"
-mkdir -p "$THROTTLE_DIR"
-touch "$DEBUG_ROUTE_LOG"
+mkdir -p "\$PRIVATE_CONFIG_DIR"
+mkdir -p "\$THROTTLE_DIR"
+touch "\$DEBUG_ROUTE_LOG"
 
-# Cleanup old dynamic routes (older than 5 minutes)
+MY_IP=\$(hostname -I | awk '{print \$1}')
+
+# Cleanup old configs (older than 5 minutes)
 (
   while true; do
-    find "$DYNAMIC_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +5 -exec rm -f {} \;
+    find "\$PRIVATE_CONFIG_DIR" -name 'acme-challenge-*.yaml' -mmin +\$CONFIG_TTL_MINUTES -exec rm -f {} \;
     sleep 60
   done
 ) &
 
-while true; do
-  inotifywait -e close_write "$ACME_START_LOG" >/dev/null 2>&1
+tail -Fn0 "\$ACME_START_LOG" | while read -r line; do
+  echo "DEBUG: Read line: \$line" >> "\$DEBUG_ROUTE_LOG"
 
-  # Get the last line (most recent event)
-  last_line=$(tail -n 1 "$ACME_START_LOG")
-  echo "DEBUG: Detected change, last_line: $last_line" >> "$DEBUG_ROUTE_LOG"
+  DOMAIN=\$(echo "\$line" | grep -oP 'domain=\\K[^ ]+')
+  CHALLENGE_IP=\$(echo "\$line" | grep -oP 'ip=\\K[^ ]+')
 
-  # Extract domain and ip
-  domain=$(echo "$last_line" | grep -oP 'domain=\K[^ ]+')
-  ip=$(echo "$last_line" | grep -oP 'ip=\K[^ ]+')
+  [ -z "\$DOMAIN" ] && echo "DEBUG: No domain found, skipping" >> "\$DEBUG_ROUTE_LOG" && continue
+  [ -z "\$CHALLENGE_IP" ] && echo "DEBUG: No IP found, skipping" >> "\$DEBUG_ROUTE_LOG" && continue
 
-  [ -z "$domain" ] && echo "DEBUG: No domain found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
-  [ -z "$ip" ] && echo "DEBUG: No IP found, skipping" >> "$DEBUG_ROUTE_LOG" && continue
-
-  safe_domain=$(echo "$domain" | tr '.' '-')
-  config_file="$DYNAMIC_CONFIG_DIR/acme-challenge-$safe_domain.yaml"
-
-  # Throttle: Only allow update if 5s have passed since last for this domain
-  throttle_file="$THROTTLE_DIR/$safe_domain.last"
-  now=$(date +%s)
-  last=0
-  if [ -f "$throttle_file" ]; then
-    last=$(cat "$throttle_file")
-  fi
-  if [ $((now - last)) -lt 5 ]; then
-    echo "DEBUG: Throttling update for $domain, only $((now - last))s since last update" >> "$DEBUG_ROUTE_LOG"
-    continue
-  fi
-  echo "$now" > "$throttle_file"
-
-  # Check if the config file exists and if the IP matches
-  current_ip=""
-  if [ -f "$config_file" ]; then
-    current_ip=$(grep -m1 'url:' "$config_file" | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
-  fi
-
-  if [ "$ip" = "$current_ip" ]; then
-    echo "DEBUG: IP unchanged for $domain ($ip), skipping update" >> "$DEBUG_ROUTE_LOG"
+  if [ "\$CHALLENGE_IP" = "\$MY_IP" ]; then
+    echo "DEBUG: Challenge owner is self (\$MY_IP), skipping" >> "\$DEBUG_ROUTE_LOG"
     continue
   fi
 
-  # Write the dynamic route config (routes ALL requests for the domain)
-  cat > "$config_file" <<YAML
+  SAFE_DOMAIN=\$(echo "\$DOMAIN" | tr '.' '-')
+  CONFIG_FILE="\$PRIVATE_CONFIG_DIR/acme-challenge-\$SAFE_DOMAIN.yaml"
+  THROTTLE_FILE="\$THROTTLE_DIR/\$SAFE_DOMAIN.last"
+  NOW=\$(date +%s)
+  LAST=0
+  if [ -f "\$THROTTLE_FILE" ]; then
+    LAST=\$(cat "\$THROTTLE_FILE")
+  fi
+  if [ \$((NOW - LAST)) -lt 5 ]; then
+    echo "DEBUG: Throttling update for \$DOMAIN, only \$((NOW - LAST))s since last update" >> "\$DEBUG_ROUTE_LOG"
+    continue
+  fi
+  echo "\$NOW" > "\$THROTTLE_FILE"
+
+  TMP_FILE="\${CONFIG_FILE}.tmp"
+  cat > "\$TMP_FILE" <<YAML
 http:
   routers:
-    acme-challenge-$safe_domain:
-      rule: "Host(\`$domain\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
-      service: acme-challenge-service-$safe_domain
+    acme-challenge-\$SAFE_DOMAIN:
+      rule: "Host(\`\$DOMAIN\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
+      service: acme-challenge-service-\$SAFE_DOMAIN
       entryPoints:
         - web
       priority: 1000
 
   services:
-    acme-challenge-service-$safe_domain:
+    acme-challenge-service-\$SAFE_DOMAIN:
       loadBalancer:
         servers:
-          - url: "http://$ip:80"
+          - url: "http://\$CHALLENGE_IP:80"
 YAML
-
-  echo "DEBUG: Updated dynamic route for $domain to $ip" >> "$DEBUG_ROUTE_LOG"
+  mv "\$TMP_FILE" "\$CONFIG_FILE"
+  echo "DEBUG: Updated dynamic route for \$DOMAIN to \$CHALLENGE_IP in \$CONFIG_FILE" >> "\$DEBUG_ROUTE_LOG"
 done
 EOF
         ]
@@ -226,6 +218,9 @@ providers:
   providersThrottleDuration: 1s
   file:
     directory: "/etc/traefik/dynamic"
+    watch: true
+  file-private:
+    directory: "/etc/traefik/dynamic-private"
     watch: true
   nomad:
       endpoint:
@@ -282,6 +277,12 @@ EOF
             type        = "bind"
             source      = "/mnt/glusterfs/traefik/dynamic"
             target      = "/etc/traefik/dynamic"
+            readonly    = false
+          },
+          {
+            type        = "bind"
+            source      = "/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"
+            target      = "/etc/traefik/dynamic-private"
             readonly    = false
           }
         ]
