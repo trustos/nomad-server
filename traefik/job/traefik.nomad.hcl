@@ -59,15 +59,21 @@ job "traefik" {
 #!/usr/bin/env bash
 
 LOG_FILE="${NOMAD_ALLOC_DIR}/logs/.traefik.stdout.fifo"
-ACME_START_LOG="/mnt/glusterfs/traefik/acme-start"
+ACME_START_LOG="/mnt/glusterfs/traefik/acme-start.log"
 INSTANCE_IP=$(hostname -I | awk '{print $1}')
 
 touch "$ACME_START_LOG"
 
+strip_ansi() {
+  # Remove ANSI color codes
+  sed 's/\x1B\[[0-9;]*[JKmsu]//g'
+}
+
 while true; do
   if [ -p "$LOG_FILE" ]; then
     while read -r line; do
-      DOMAIN=$(echo "$line" | awk '/Trying to challenge certificate for domain/ { match($0, /\[([a-zA-Z0-9.-]+)\]/, arr); print arr[1] }')
+      clean_line=$(echo "$line" | strip_ansi)
+      DOMAIN=$(echo "$clean_line" | grep -oP 'Trying to challenge certificate for domain \[\K[a-zA-Z0-9.-]+(?=\])')
       if [ -n "$DOMAIN" ]; then
         TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         (
