@@ -24,7 +24,7 @@ job "traefik" {
         memory = 10
       }
     }
-    }
+
 
     task "init-traefik-acme-files" {
       driver = "raw_exec"
