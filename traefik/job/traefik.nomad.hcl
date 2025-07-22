@@ -9,19 +9,21 @@ job "traefik" {
       distinct_hosts = true
     }
 
-    task "init-traefik-dir" {
+    # Prestart task: ensure the dynamic config directory exists for all dynamic configs
+    task "init-traefik-dynamic-dir" {
       driver = "raw_exec"
       lifecycle {
         hook = "prestart"
       }
       config {
         command = "mkdir"
-        args    = ["-p", "/mnt/glusterfs/traefik"]
+        args    = ["-p", "/mnt/glusterfs/traefik/dynamic"]
       }
       resources {
-        cpu    = 50
-        memory = 32
+        cpu    = 10
+        memory = 10
       }
+    }
     }
 
     task "init-traefik-acme-files" {
@@ -39,63 +41,7 @@ job "traefik" {
       }
     }
 
-    # Prestart task: create private dynamic config directory for this allocation
-    task "init-private-dir" {
-      driver = "raw_exec"
-      lifecycle {
-        hook = "prestart"
-      }
-      config {
-        command = "mkdir"
-        args    = ["-p", "/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"]
-      }
-      resources {
-        cpu    = 10
-        memory = 10
-      }
-    }
 
-    # Prestart task: create union dynamic config directory and symlink shared and private configs
-    task "init-dynamic-union-dir" {
-      driver = "raw_exec"
-      lifecycle {
-        hook = "prestart"
-      }
-      config {
-        command = "bash"
-        args = [
-          "-c",
-          <<EOF
-set -e
-UNION_DIR="/mnt/glusterfs/traefik/dynamic-union-${NOMAD_ALLOC_INDEX}"
-SHARED_DIR="/mnt/glusterfs/traefik/dynamic"
-PRIVATE_DIR="/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"
-
-mkdir -p "$UNION_DIR"
-mkdir -p "$SHARED_DIR"
-mkdir -p "$PRIVATE_DIR"
-
-# Symlink shared configs
-if [ ! -e "$UNION_DIR/shared" ]; then
-  ln -s "$SHARED_DIR" "$UNION_DIR/shared"
-fi
-
-# Symlink private configs
-if [ ! -e "$UNION_DIR/private" ]; then
-  ln -s "$PRIVATE_DIR" "$UNION_DIR/private"
-fi
-
-# Optionally, flatten all .yaml files into the union dir root for Traefik to see them directly
-find "$SHARED_DIR" -maxdepth 1 -name '*.yaml' -exec ln -sf {} "$UNION_DIR/" \;
-find "$PRIVATE_DIR" -maxdepth 1 -name '*.yaml' -exec ln -sf {} "$UNION_DIR/" \;
-EOF
-        ]
-      }
-      resources {
-        cpu    = 10
-        memory = 10
-      }
-    }
 
     network {
       port "http" {
