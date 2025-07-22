@@ -22,6 +22,48 @@ job "traefik" {
         cpu    = 50
         memory = 32
       }
+
+      # Prestart task: create union dynamic config directory and symlink shared and private configs
+      task "init-dynamic-union-dir" {
+        driver = "raw_exec"
+        lifecycle {
+          hook = "prestart"
+        }
+        config {
+          command = "bash"
+          args = [
+            "-c",
+            <<EOF
+  set -e
+  UNION_DIR="/mnt/glusterfs/traefik/dynamic-union-${NOMAD_ALLOC_INDEX}"
+  SHARED_DIR="/mnt/glusterfs/traefik/dynamic"
+  PRIVATE_DIR="/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"
+
+  mkdir -p "$UNION_DIR"
+  mkdir -p "$SHARED_DIR"
+  mkdir -p "$PRIVATE_DIR"
+
+  # Symlink shared configs
+  if [ ! -e "$UNION_DIR/shared" ]; then
+    ln -s "$SHARED_DIR" "$UNION_DIR/shared"
+  fi
+
+  # Symlink private configs
+  if [ ! -e "$UNION_DIR/private" ]; then
+    ln -s "$PRIVATE_DIR" "$UNION_DIR/private"
+  fi
+
+  # Optionally, flatten all .yaml files into the union dir root for Traefik to see them directly
+  find "$SHARED_DIR" -maxdepth 1 -name '*.yaml' -exec ln -sf {} "$UNION_DIR/" \;
+  find "$PRIVATE_DIR" -maxdepth 1 -name '*.yaml' -exec ln -sf {} "$UNION_DIR/" \;
+  EOF
+          ]
+        }
+        resources {
+          cpu    = 10
+          memory = 10
+        }
+      }
     }
 
     task "init-traefik-acme-files" {
@@ -239,9 +281,6 @@ providers:
   file:
     directory: "/etc/traefik/dynamic"
     watch: true
-  file-private:
-    directory: "/etc/traefik/dynamic-private"
-    watch: true
   nomad:
       endpoint:
         address: "http://${NLB_IP}:4646"
@@ -295,14 +334,8 @@ EOF
           },
           {
             type        = "bind"
-            source      = "/mnt/glusterfs/traefik/dynamic"
+            source      = "/mnt/glusterfs/traefik/dynamic-union-${NOMAD_ALLOC_INDEX}"
             target      = "/etc/traefik/dynamic"
-            readonly    = false
-          },
-          {
-            type        = "bind"
-            source      = "/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"
-            target      = "/etc/traefik/dynamic-private"
             readonly    = false
           }
         ]
