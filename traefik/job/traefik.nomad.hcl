@@ -39,6 +39,22 @@ job "traefik" {
       }
     }
 
+    # Prestart task: create private dynamic config directory for this allocation
+    task "init-private-dir" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "mkdir"
+        args    = ["-p", "/mnt/glusterfs/traefik/dynamic-private-${NOMAD_ALLOC_INDEX}"]
+      }
+      resources {
+        cpu    = 5
+        memory = 5
+      }
+    }
+
     network {
       port "http" {
         static = 80
@@ -165,12 +181,12 @@ tail -Fn0 "$ACME_START_LOG" | while read -r line; do
   fi
   echo "$NOW" > "$THROTTLE_FILE"
 
-  TMP_FILE="${CONFIG_FILE}.tmp"
+  TMP_FILE="$CONFIG_FILE.tmp"
   cat > "$TMP_FILE" <<YAML
 http:
   routers:
     acme-challenge-$SAFE_DOMAIN:
-      rule: "Host(\\\`$DOMAIN\\\`) && PathPrefix(\\\`/.well-known/acme-challenge/\\\`)"
+      rule: "Host(\`$DOMAIN\`) && PathPrefix(\`/.well-known/acme-challenge/\`)"
       service: acme-challenge-service-$SAFE_DOMAIN
       entryPoints:
         - web
