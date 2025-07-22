@@ -280,7 +280,7 @@ EOF
           },
           {
             type        = "bind"
-            source      = "/mnt/glusterfs/traefik/dynamic-union-${NOMAD_ALLOC_INDEX}"
+            source      = "/mnt/glusterfs/traefik/dynamic"
             target      = "/etc/traefik/dynamic"
             readonly    = false
           }
