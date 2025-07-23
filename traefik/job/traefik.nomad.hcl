@@ -8,10 +8,12 @@ job "traefik" {
     task "acme-redirect-cron" {
       driver = "docker"
       config {
-        image = "hashicorp/nomad:latest"
+        image = "alpine:latest"
         command = "sh"
         args = ["-c", <<EOT
-apk add --no-cache jq curl || apt-get update && apt-get install -y jq curl || true
+apk add --no-cache bash jq curl && \
+wget -O /usr/local/bin/nomad https://releases.hashicorp.com/nomad/1.6.3/nomad_1.6.3_linux_amd64 && \
+chmod +x /usr/local/bin/nomad
 while true; do
   LEADER_IP=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
   if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
