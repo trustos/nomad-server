@@ -210,9 +210,7 @@ EOF
       service {
         name = "traefik-leader"
         port = "http"
-        tags = [
-          {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}"acme-leader"{{ else }}"acme-follower"{{ end }}
-        ]
+        tags = ["{{ if eq (env \"NOMAD_ALLOC_INDEX\") \"0\" }}acme-leader{{ else }}acme-follower{{ end }}"]
         check {
           type     = "http"
           path     = "/ping"
