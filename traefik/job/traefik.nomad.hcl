@@ -121,7 +121,7 @@ providers:
         - "default"
 
 certificatesResolvers:
-{{ if eq env "NOMAD_ALLOC_INDEX" "0" }}
+{{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}
   cert-prod:
     acme:
       email: trustos@gmail.com
