@@ -85,45 +85,6 @@ EOT
       port "https" {
         static = 443
       }
-    }
-
-    # Watch for ACME file changes and restart follower allocations
-    task "acme-follower-restart-watcher" {
-      driver = "raw_exec"
-      config {
-        command = "bash"
-        args = ["-c", <<EOT
-  if ! command -v inotifywait >/dev/null 2>&1; then
-    apt-get update && apt-get install -y inotify-tools jq
-  fi
-
-  ACME_DIR="/mnt/glusterfs/traefik"
-  ACME_FILES="acme-prod.json acme-stag.json"
-
-  while true; do
-    inotifywait -e close_write,modify \$ACME_DIR/\$ACME_FILES
-    echo "\$(date) - Detected change in ACME file(s), restarting follower allocations..."
-
-    # Get all running follower allocations for the traefik job
-    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '
-      .[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and .AllocatedResources.Shared.Env.NOMAD_ALLOC_INDEX != "0") | .ID
-    ' | while read alloc_id; do
-      echo "Restarting follower allocation: \$alloc_id"
-      NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "\$alloc_id"
-    done
-  done
-  EOT
-        ]
-      }
-      env {
-        NLB_IP = "${NLB_IP}"
-        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-      }
-      resources {
-        cpu    = 50
-        memory = 64
-      }
-    }
 
     # Prestart task: ensure the dynamic config directory exists for all dynamic configs
     task "init-traefik-dynamic-dir" {
