@@ -249,16 +249,9 @@ EOF
       config {
         command = "bash"
         args = ["-c", <<EOT
-if ! command -v inotifywait >/dev/null 2>&1; then
-  apt-get update && apt-get install -y inotify-tools jq
-fi
-
 ACME_DIR="/mnt/glusterfs/traefik"
 ACME_FILES="acme-prod.json acme-stag.json"
 DEBOUNCE_SECONDS=60
-
-# Ensure files exist before watching
-touch \$ACME_DIR/acme-prod.json \$ACME_DIR/acme-stag.json
 
 while true; do
   inotifywait -e close_write $ACME_DIR/$ACME_FILES
