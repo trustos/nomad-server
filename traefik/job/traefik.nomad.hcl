@@ -40,6 +40,55 @@ job "traefik" {
       lifecycle {
         hook = "prestart"
       }
+
+      task "render-acme-redirect" {
+        driver = "raw_exec"
+        lifecycle {
+          hook = "poststart"
+        }
+        env {
+          TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
+        }
+        config {
+          command = "bash"
+          args = ["-c", <<EOT
+  export NOMAD_TOKEN="$TRAEFIK_TOKEN"
+  LEADER_IP=$(nomad service info -json traefik-leader 2>/dev/null | jq -r '.Service.Address' | head -n1)
+  if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
+    LEADER_IP="127.0.0.1"
+  fi
+  cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
+  http:
+    routers:
+      acme-challenge-redirect:
+        rule: PathPrefix(\`/.well-known/acme-challenge/\`)
+        entryPoints:
+          - web
+        priority: 10000
+        service: acme-leader-forward
+        middlewares:
+          - strip-challenge
+
+    middlewares:
+      strip-challenge:
+        stripPrefix:
+          prefixes:
+            - "/.well-known/acme-challenge"
+
+    services:
+      acme-leader-forward:
+        loadBalancer:
+          servers:
+            - url: "http://$LEADER_IP:80"
+  EOF
+  EOT
+          ]
+        }
+        resources {
+          cpu    = 10
+          memory = 10
+        }
+      }
       config {
         command = "bash"
         args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 600 /mnt/glusterfs/traefik/acme-*.json"]
@@ -58,37 +107,7 @@ job "traefik" {
         NLB_IP = "${NLB_IP}"
       }
 
-      template {
-        data = <<EOF
-http:
-  routers:
-    acme-challenge-redirect:
-      rule: PathPrefix(`/.well-known/acme-challenge/`)
-      entryPoints:
-        - web
-      priority: 10000
-      service: acme-leader-forward
-      middlewares:
-        - strip-challenge
 
-  middlewares:
-    strip-challenge:
-      stripPrefix:
-        prefixes:
-          - "/.well-known/acme-challenge"
-
-  services:
-    acme-leader-forward:
-      loadBalancer:
-        servers:
-          - url: "http://{{ with service "traefik-leader" }}{{ (index . 0).Address }}{{ else }}127.0.0.1{{ end }}:80"
-EOF
-        destination = "/etc/traefik/dynamic/acme-redirect.yaml"
-        change_mode = "restart"
-        wait {
-          min = "10s"
-          max = "60s"
-        }
       }
 
       template {
