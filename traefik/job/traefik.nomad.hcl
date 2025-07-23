@@ -211,7 +211,7 @@ EOF
         name = "traefik-leader"
         port = "http"
         tags = [
-          "acme-leader"
+          "acme-leader",
           {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}"leader"{{ end }}
         ]
         check {
