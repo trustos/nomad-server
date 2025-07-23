@@ -257,15 +257,16 @@ ACME_DIR="/mnt/glusterfs/traefik"
 ACME_FILES="acme-prod.json acme-stag.json"
 DEBOUNCE_SECONDS=60
 
+# Ensure files exist before watching
+touch \$ACME_DIR/acme-prod.json \$ACME_DIR/acme-stag.json
+
 while true; do
   inotifywait -e close_write \$ACME_DIR/\$ACME_FILES
-  echo "\$(date) - Detected change in ACME file(s), restarting follower allocations..."
+  echo "$(date) - Detected change in ACME file(s), restarting follower allocations..."
 
-  NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '
-    .[] | select(.TaskGroup==\"traefik\" and .ClientStatus==\"running\" and .AllocatedResources.Shared.Env.NOMAD_ALLOC_INDEX != \"0\") | .ID
-  ' | while read alloc_id; do
-    echo "Restarting follower allocation: \$alloc_id"
-    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "\$alloc_id"
+  NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and .AllocatedResources.Shared.Env.NOMAD_ALLOC_INDEX != "0") | .ID' | while read alloc_id; do
+    echo "Restarting follower allocation: $alloc_id"
+    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "$alloc_id"
   done
 
   echo "$(date) - Debouncing for $DEBOUNCE_SECONDS seconds..."
