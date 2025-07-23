@@ -10,6 +10,7 @@ job "traefik" {
       config {
         command = "bash"
         args = ["-c", <<EOT
+FIRST_FOUND=0
 while true; do
   TS="$(date '+%Y-%m-%d %H:%M:%S')"
   LEADER_IP=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
@@ -23,7 +24,7 @@ http:
       rule: PathPrefix(\`/.well-known/acme-challenge/\`)
       entryPoints:
         - web
-      priority: 1000
+      priority: 10000
       service: acme-leader-forward
       middlewares:
         - strip-challenge
@@ -40,11 +41,16 @@ http:
         servers:
           - url: "http://$LEADER_IP:80"
 EOF
-    break
+    FIRST_FOUND=1
   else
-    echo "$TS - Leader IP not found, will retry in 60s."
+    echo "$TS - Leader IP not found, will retry soon."
   fi
-  sleep 60
+
+  if [ "$FIRST_FOUND" -eq 1 ]; then
+    sleep 300  # 5 minutes
+  else
+    sleep 10   # Fast retry until first success
+  fi
 done
 EOT
         ]
