@@ -11,13 +11,21 @@ job "traefik" {
         command = "bash"
         args = ["-c", <<EOT
 FIRST_FOUND=0
+DYNAMIC_CONFIG_PATH="/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
+
 while true; do
   TS="$(date '+%Y-%m-%d %H:%M:%S')"
-  LEADER_IP=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
-  echo "$TS - Raw leader IP: $LEADER_IP"
-  if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ]; then
-    echo "$TS - Cron: Using leader IP: $LEADER_IP"
-    cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
+  # Query Nomad for the traefik-0 service
+  SERVICE_INFO=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null)
+  LEADER_IP=$(echo "$SERVICE_INFO" | jq -r '.[0].Address')
+  ROLE=$(echo "$SERVICE_INFO" | jq -r '.[0].Tags[]' | grep '^role=' | cut -d= -f2)
+
+  echo "$TS - Raw leader IP: $LEADER_IP, role tag: $ROLE"
+
+  # Validate that the service is actually the leader (role=0)
+  if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ] && [ "$ROLE" = "0" ]; then
+    echo "$TS - Cron: Using leader IP: $LEADER_IP (confirmed role=0)"
+    cat > "$DYNAMIC_CONFIG_PATH" <<EOF
 http:
   routers:
     acme-challenge-redirect:
@@ -35,7 +43,12 @@ http:
 EOF
     FIRST_FOUND=1
   else
-    echo "$TS - Leader IP not found, will retry soon."
+    echo "$TS - Leader IP not found or not role=0, will retry soon."
+    # Remove the config if we can't find a valid leader
+    if [ "$FIRST_FOUND" -eq 0 ] && [ -f "$DYNAMIC_CONFIG_PATH" ]; then
+      rm -f "$DYNAMIC_CONFIG_PATH"
+      echo "$TS - Removed stale dynamic config."
+    fi
   fi
 
   if [ "$FIRST_FOUND" -eq 1 ]; then
@@ -52,8 +65,8 @@ EOT
         NOMAD_ADDR    = "http://${NLB_IP}:4646"
       }
       resources {
-        cpu    = 100
-        memory = 64
+        cpu    = 200
+        memory = 128
       }
     }
   }
