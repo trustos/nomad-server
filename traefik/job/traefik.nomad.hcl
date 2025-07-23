@@ -6,16 +6,13 @@ job "traefik" {
     count = 1
 
     task "acme-redirect-cron" {
-      driver = "docker"
+      driver = "raw_exec"
       config {
-        image = "alpine:latest"
-        command = "sh"
+        command = "bash"
         args = ["-c", <<EOT
-apk add --no-cache bash jq curl && \
-wget -O /usr/local/bin/nomad https://releases.hashicorp.com/nomad/1.6.3/nomad_1.6.3_linux_amd64 && \
-chmod +x /usr/local/bin/nomad
 while true; do
   LEADER_IP=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
+  echo "Raw leader IP: $LEADER_IP"
   if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
     LEADER_IP="127.0.0.1"
   fi
@@ -48,14 +45,6 @@ EOF
 done
 EOT
         ]
-        mounts = [
-          {
-            type     = "bind"
-            source   = "/mnt/glusterfs/traefik/dynamic"
-            target   = "/mnt/glusterfs/traefik/dynamic"
-            readonly = false
-          }
-        ]
       }
       env {
         TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
@@ -63,7 +52,7 @@ EOT
       }
       resources {
         cpu    = 100
-        memory = 256
+        memory = 64
       }
     }
   }
