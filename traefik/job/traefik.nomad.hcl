@@ -63,7 +63,7 @@ job "traefik" {
         command = "bash"
         args = ["-c", <<EOT
 export NOMAD_TOKEN="$TRAEFIK_TOKEN"
-LEADER_IP=$(nomad service info --namespace=traefik -json traefik-leader 2>/dev/null | jq -r '.[] | select(.Tags[]? == "role=0") | .Address' | head -n1)
+LEADER_IP=$(nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
 if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
   LEADER_IP="127.0.0.1"
 fi
@@ -208,11 +208,11 @@ EOF
 
       # Register traefik-leader service only on leader allocation
       service {
-        name = "traefik-leader"
+        name = "traefik-${NOMAD_ALLOC_INDEX}"
         port = "http"
         tags = [
           "acme",
-          "role=${NOMAD_ALLOC_INDEX}"
+          "traefik-role=${NOMAD_ALLOC_INDEX}"
         ]
         check {
           type     = "http"
