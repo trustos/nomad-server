@@ -92,7 +92,7 @@ job "traefik" {
 entryPoints:
   web:
     address: ":80"
-    {{ if ne env "NOMAD_ALLOC_INDEX" "0" }}
+    {{ if ne (env "NOMAD_ALLOC_INDEX") "0" }}
     allowACMEByPass: true
     {{ end }}
 
