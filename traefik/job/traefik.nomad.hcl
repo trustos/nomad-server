@@ -11,20 +11,19 @@ job "traefik" {
         command = "bash"
         args = ["-c", <<EOT
 while true; do
+  TS="$(date '+%Y-%m-%d %H:%M:%S')"
   LEADER_IP=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
-  echo "Raw leader IP: $LEADER_IP"
-  if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
-    LEADER_IP="127.0.0.1"
-  fi
-  echo "Cron: Using leader IP: $LEADER_IP"
-  cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
+  echo "$TS - Raw leader IP: $LEADER_IP"
+  if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ]; then
+    echo "$TS - Cron: Using leader IP: $LEADER_IP"
+    cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
 http:
   routers:
     acme-challenge-redirect:
       rule: PathPrefix(\`/.well-known/acme-challenge/\`)
       entryPoints:
         - web
-      priority: 10000
+      priority: 1000
       service: acme-leader-forward
       middlewares:
         - strip-challenge
@@ -41,6 +40,10 @@ http:
         servers:
           - url: "http://$LEADER_IP:80"
 EOF
+    break
+  else
+    echo "$TS - Leader IP not found, will retry in 60s."
+  fi
   sleep 60
 done
 EOT
