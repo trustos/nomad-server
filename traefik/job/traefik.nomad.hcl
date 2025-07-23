@@ -58,24 +58,6 @@ job "traefik" {
         NLB_IP = "${NLB_IP}"
       }
 
-      {{ if eq env "NOMAD_ALLOC_INDEX" "0" }}
-      service {
-        name = "traefik-leader"
-        port = "http"
-        provider = "nomad"
-      }
-      {{ end }}
-
-      template {
-        destination = "local/leader_ip.env"
-        env         = true
-        change_mode = "restart"
-
-        data = <<EOT
-      LEADER_IP="{{ range service "traefik-leader" }}{{ .ServiceAddress }}:{{ .ServicePort }}{{ end }}"
-      EOT
-      }
-
       template {
         data = <<EOF
       http:
@@ -99,7 +81,7 @@ job "traefik" {
           acme-leader-forward:
             loadBalancer:
               servers:
-                - url: "http://{{ env "LEADER_IP" }}:80"
+                - url: "http://${NLB_IP}:80"
       EOF
         destination = "/etc/traefik/dynamic/acme-redirect.yaml"
         change_mode = "restart"
