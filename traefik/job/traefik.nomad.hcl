@@ -108,9 +108,6 @@ EOT
         NLB_IP = "${NLB_IP}"
       }
 
-
-      }
-
       template {
         data = <<EOF
 entryPoints:
