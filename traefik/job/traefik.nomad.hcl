@@ -200,6 +200,7 @@ EOF
           timeout  = "2s"
         }
         enable_tag_override = true
+        provider = "nomad"
       }
 
       resources {
