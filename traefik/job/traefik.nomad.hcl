@@ -54,15 +54,16 @@ job "traefik" {
     task "acme-redirect-cron" {
       driver = "docker"
       config {
-        image = "bitnami/nomad:latest"
-        command = "bash"
-        args = ["-c", <<EOT
+        image = "hashicorp/nomad:latest"
+        command = "sh"
+        args = ["-c", "
+apk add --no-cache jq curl || apt-get update && apt-get install -y jq curl || true
 while true; do
-  LEADER_IP=$(NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
-  if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
-    LEADER_IP="127.0.0.1"
+  LEADER_IP=$(NOMAD_TOKEN=\"$TRAEFIK_TOKEN\" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
+  if [ -z \"$LEADER_IP\" ] || [ \"$LEADER_IP\" = \"null\" ]; then
+    LEADER_IP=\"127.0.0.1\"
   fi
-  echo "Cron: Using leader IP: $LEADER_IP"
+  echo \"Cron: Using leader IP: $LEADER_IP\"
   cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
 http:
   routers:
@@ -79,18 +80,17 @@ http:
     strip-challenge:
       stripPrefix:
         prefixes:
-          - "/.well-known/acme-challenge"
+          - \"/.well-known/acme-challenge\"
 
   services:
     acme-leader-forward:
       loadBalancer:
         servers:
-          - url: "http://$LEADER_IP:80"
+          - url: \"http://$LEADER_IP:80\"
 EOF
   sleep 60
 done
-EOT
-        ]
+"]
         mounts = [
           {
             type     = "bind"
@@ -102,6 +102,7 @@ EOT
       }
       env {
         TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
+        NOMAD_ADDR    = "http://${NLB_IP}:4646"
       }
       resources {
         cpu    = 10
