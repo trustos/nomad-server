@@ -254,9 +254,9 @@ ACME_FILES="acme-prod.json acme-stag.json"
 DEBOUNCE_SECONDS=60
 
 while true; do
-  echo "Watching: $ACME_DIR/$ACME_FILES"
-  ls -l $ACME_DIR/$ACME_FILES
-  inotifywait -e close_write $ACME_DIR/$ACME_FILES
+  echo "Watching: $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json"
+  ls -l $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json
+  inotifywait -e close_write $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json
   echo "$(date) - Detected change in ACME file(s), restarting follower allocations..."
 
   NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID' | while read alloc_id; do
