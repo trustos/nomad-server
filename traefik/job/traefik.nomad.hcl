@@ -63,10 +63,17 @@ job "traefik" {
         command = "bash"
         args = ["-c", <<EOT
 export NOMAD_TOKEN="$TRAEFIK_TOKEN"
-LEADER_IP=$(nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
+for i in {1..30}; do
+  LEADER_IP=$(nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
+  if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ]; then
+    break
+  fi
+  sleep 2
+done
 if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
   LEADER_IP="127.0.0.1"
 fi
+echo "Using leader IP: $LEADER_IP"
 cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
 http:
   routers:
