@@ -126,6 +126,8 @@ entryPoints:
   websecure:
     address: ":443"
 
+ping: {}
+
 log:
   level: DEBUG
 
