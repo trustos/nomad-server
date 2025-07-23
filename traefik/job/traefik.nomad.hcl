@@ -81,7 +81,7 @@ http:
     acme-leader-forward:
       loadBalancer:
         servers:
-          - url: "http://{{ with service "traefik-leader" }}{{ (index . 0).Address }}{{ end }}:80"
+          - url: "http://{{ with service "traefik-leader" }}{{ (index . 0).Address }}{{ else }}127.0.0.1{{ end }}:80"
 EOF
         destination = "/etc/traefik/dynamic/acme-redirect.yaml"
         change_mode = "restart"
