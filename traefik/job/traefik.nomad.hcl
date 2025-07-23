@@ -63,7 +63,7 @@ job "traefik" {
         command = "bash"
         args = ["-c", <<EOT
 for i in {1..30}; do
-  LEADER_IP=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
+  LEADER_IP=$(NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
   if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ]; then
     break
   fi
