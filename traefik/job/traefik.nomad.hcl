@@ -85,6 +85,10 @@ http:
 EOF
         destination = "/etc/traefik/dynamic/acme-redirect.yaml"
         change_mode = "restart"
+        wait {
+          min = "10s"
+          max = "60s"
+        }
       }
 
       template {
