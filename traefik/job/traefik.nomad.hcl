@@ -51,29 +51,19 @@ job "traefik" {
       }
     }
 
-    task "render-acme-redirect" {
-      driver = "raw_exec"
-      lifecycle {
-        hook = "poststart"
-      }
-      env {
-        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-      }
+    task "acme-redirect-cron" {
+      driver = "docker"
       config {
+        image = "bitnami/nomad:latest"
         command = "bash"
         args = ["-c", <<EOT
-for i in {1..30}; do
+while true; do
   LEADER_IP=$(NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad service info --namespace=traefik -json traefik-0 2>/dev/null | jq -r '.[0].Address')
-  if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ]; then
-    break
+  if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
+    LEADER_IP="127.0.0.1"
   fi
-  sleep 2
-done
-if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
-  LEADER_IP="127.0.0.1"
-fi
-echo "Using leader IP: $LEADER_IP"
-cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
+  echo "Cron: Using leader IP: $LEADER_IP"
+  cat > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml <<EOF
 http:
   routers:
     acme-challenge-redirect:
@@ -97,13 +87,29 @@ http:
         servers:
           - url: "http://$LEADER_IP:80"
 EOF
+  sleep 60
+done
 EOT
         ]
+      }
+      env {
+        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
       }
       resources {
         cpu    = 10
         memory = 10
       }
+      volume_mount {
+        volume      = "traefik-dynamic"
+        destination = "/mnt/glusterfs/traefik/dynamic"
+        read_only   = false
+      }
+    }
+
+    volume "traefik-dynamic" {
+      type      = "host"
+      source    = "/mnt/glusterfs/traefik/dynamic"
+      read_only = false
     }
 
     task "traefik" {
