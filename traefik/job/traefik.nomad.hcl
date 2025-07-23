@@ -60,29 +60,29 @@ job "traefik" {
 
       template {
         data = <<EOF
-      http:
-        routers:
-          acme-challenge-redirect:
-            rule: PathPrefix(`/.well-known/acme-challenge/`)
-            entryPoints:
-              - web
-            priority: 10000
-            service: acme-leader-forward
-            middlewares:
-              - strip-challenge
+http:
+  routers:
+    acme-challenge-redirect:
+      rule: PathPrefix(`/.well-known/acme-challenge/`)
+      entryPoints:
+        - web
+      priority: 10000
+      service: acme-leader-forward
+      middlewares:
+        - strip-challenge
 
-        middlewares:
-          strip-challenge:
-            stripPrefix:
-              prefixes:
-                - "/.well-known/acme-challenge"
+  middlewares:
+    strip-challenge:
+      stripPrefix:
+        prefixes:
+          - "/.well-known/acme-challenge"
 
-        services:
-          acme-leader-forward:
-            loadBalancer:
-              servers:
-                - url: "http://${NLB_IP}:80"
-      EOF
+  services:
+    acme-leader-forward:
+      loadBalancer:
+        servers:
+          - url: "http://{{ with service \"traefik-leader\" }}{{ (index . 0).Address }}{{ end }}:80"
+EOF
         destination = "/etc/traefik/dynamic/acme-redirect.yaml"
         change_mode = "restart"
       }
@@ -183,6 +183,23 @@ EOF
             readonly    = false
           }
         ]
+      }
+
+      # Register traefik-leader service only on leader allocation
+      service {
+        name = "traefik-leader"
+        port = "http"
+        tags = [
+          "acme-leader",
+          "{{ if eq (env \"NOMAD_ALLOC_INDEX\") \"0\" }}leader{{ end }}"
+        ]
+        check {
+          type     = "http"
+          path     = "/ping"
+          interval = "10s"
+          timeout  = "2s"
+        }
+        enable_tag_override = true
       }
 
       resources {
