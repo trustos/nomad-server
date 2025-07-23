@@ -2,54 +2,8 @@ job "traefik" {
   namespace = "traefik"
   datacenters = ["dc1"]
 
-  group "traefik" {
-    count = 2
-
-    constraint {
-      distinct_hosts = true
-    }
-
-    network {
-      port "http" {
-        static = 80
-      }
-      port "https" {
-        static = 443
-      }
-    }
-
-    # Prestart task: ensure the dynamic config directory exists for all dynamic configs
-    task "init-traefik-dynamic-dir" {
-      driver = "raw_exec"
-      lifecycle {
-        hook = "prestart"
-      }
-      config {
-        command = "mkdir"
-        args    = ["-p", "/mnt/glusterfs/traefik/dynamic"]
-      }
-      resources {
-        cpu    = 10
-        memory = 10
-      }
-    }
-
-
-    task "init-traefik-acme-files" {
-      driver = "raw_exec"
-      lifecycle {
-        hook = "prestart"
-      }
-
-      config {
-        command = "bash"
-        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 600 /mnt/glusterfs/traefik/acme-*.json"]
-      }
-      resources {
-        cpu = 10
-        memory = 10
-      }
-    }
+  group "acme-redirect-cron" {
+    count = 1
 
     task "acme-redirect-cron" {
       driver = "docker"
@@ -106,10 +60,62 @@ EOT
         NOMAD_ADDR    = "http://${NLB_IP}:4646"
       }
       resources {
+        cpu    = 100
+        memory = 256
+      }
+    }
+  }
+
+  group "traefik" {
+    count = 2
+
+    constraint {
+      distinct_hosts = true
+    }
+
+    network {
+      port "http" {
+        static = 80
+      }
+      port "https" {
+        static = 443
+      }
+    }
+
+    # Prestart task: ensure the dynamic config directory exists for all dynamic configs
+    task "init-traefik-dynamic-dir" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "mkdir"
+        args    = ["-p", "/mnt/glusterfs/traefik/dynamic"]
+      }
+      resources {
         cpu    = 10
         memory = 10
       }
     }
+
+
+    task "init-traefik-acme-files" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+
+      config {
+        command = "bash"
+        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 600 /mnt/glusterfs/traefik/acme-*.json"]
+      }
+      resources {
+        cpu = 10
+        memory = 10
+      }
+    }
+
+
 
     task "traefik" {
       driver = "docker"
