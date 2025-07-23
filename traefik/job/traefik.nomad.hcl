@@ -268,8 +268,8 @@ while true; do
     NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "\$alloc_id"
   done
 
-  echo "\$(date) - Debouncing for \$DEBOUNCE_SECONDS seconds..."
-  sleep \$DEBOUNCE_SECONDS
+  echo "$(date) - Debouncing for $DEBOUNCE_SECONDS seconds..."
+  sleep $DEBOUNCE_SECONDS
 done
 EOT
         ]
