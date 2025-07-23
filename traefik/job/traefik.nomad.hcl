@@ -211,7 +211,8 @@ EOF
         name = "traefik-${NOMAD_ALLOC_INDEX}"
         port = "http"
         tags = [
-          "acme"
+          "acme",
+          "role=${NOMAD_ALLOC_INDEX}"
         ]
         check {
           type     = "http"
