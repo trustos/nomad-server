@@ -346,7 +346,7 @@ EOF
     }
   }
 
-  # Global ACME watcher group (single instance)
+
   group "acme-watcher" {
     count = 1
     type  = "system"
@@ -391,4 +391,5 @@ EOF
       }
     }
   }
+}
 }
