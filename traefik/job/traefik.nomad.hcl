@@ -15,14 +15,12 @@ DYNAMIC_CONFIG_PATH="/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
 
 while true; do
   TS="$(date '+%Y-%m-%d %H:%M:%S')"
-  # Query Nomad for the traefik-0 service
   SERVICE_INFO=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null)
   LEADER_IP=$(echo "$SERVICE_INFO" | jq -r '.[0].Address')
   ROLE=$(echo "$SERVICE_INFO" | jq -r '.[0].Tags[]' | grep '^role=' | cut -d= -f2)
 
   echo "$TS - Raw leader IP: $LEADER_IP, role tag: $ROLE"
 
-  # Validate that the service is actually the leader (role=0)
   if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ] && [ "$ROLE" = "0" ]; then
     echo "$TS - Cron: Using leader IP: $LEADER_IP (confirmed role=0)"
     cat > "$DYNAMIC_CONFIG_PATH" <<EOF
@@ -44,7 +42,6 @@ EOF
     FIRST_FOUND=1
   else
     echo "$TS - Leader IP not found or not role=0, will retry soon."
-    # Remove the config if we can't find a valid leader
     if [ "$FIRST_FOUND" -eq 0 ] && [ -f "$DYNAMIC_CONFIG_PATH" ]; then
       rm -f "$DYNAMIC_CONFIG_PATH"
       echo "$TS - Removed stale dynamic config."
@@ -52,9 +49,9 @@ EOF
   fi
 
   if [ "$FIRST_FOUND" -eq 1 ]; then
-    sleep 300  # 5 minutes
+    sleep 300
   else
-    sleep 10   # Fast retry until first success
+    sleep 10
   fi
 done
 EOT
@@ -85,8 +82,8 @@ EOT
       port "https" {
         static = 443
       }
+    }
 
-    # Prestart task: ensure the dynamic config directory exists for all dynamic configs
     task "init-traefik-dynamic-dir" {
       driver = "raw_exec"
       lifecycle {
@@ -102,13 +99,11 @@ EOT
       }
     }
 
-
     task "init-traefik-acme-files" {
       driver = "raw_exec"
       lifecycle {
         hook = "prestart"
       }
-
       config {
         command = "bash"
         args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 600 /mnt/glusterfs/traefik/acme-*.json"]
@@ -119,16 +114,12 @@ EOT
       }
     }
 
-
-
     task "traefik" {
       driver = "docker"
-
       env {
         TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
         NLB_IP = "${NLB_IP}"
       }
-
       template {
         data = <<EOF
 entryPoints:
@@ -198,53 +189,6 @@ EOF
         destination = "local/traefik.yaml"
         change_mode = "restart"
       }
-
-  # Global ACME watcher group (single instance)
-  group "acme-watcher" {
-    count = 1
-    type  = "system"
-
-    task "acme-follower-restart-watcher" {
-      driver = "raw_exec"
-      config {
-        command = "bash"
-        args = ["-c", <<EOT
-  if ! command -v inotifywait >/dev/null 2>&1; then
-    apt-get update && apt-get install -y inotify-tools jq
-  fi
-
-  ACME_DIR="/mnt/glusterfs/traefik"
-  ACME_FILES="acme-prod.json acme-stag.json"
-  DEBOUNCE_SECONDS=60
-
-  while true; do
-    inotifywait -e close_write \$ACME_DIR/\$ACME_FILES
-    echo "\$(date) - Detected change in ACME file(s), restarting follower allocations..."
-
-    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '
-      .[] | select(.TaskGroup==\"traefik\" and .ClientStatus==\"running\" and .AllocatedResources.Shared.Env.NOMAD_ALLOC_INDEX != \"0\") | .ID
-    ' | while read alloc_id; do
-      echo "Restarting follower allocation: \$alloc_id"
-      NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "\$alloc_id"
-    done
-
-    echo "\$(date) - Debouncing for \$DEBOUNCE_SECONDS seconds..."
-    sleep \$DEBOUNCE_SECONDS
-  done
-  EOT
-        ]
-      }
-      env {
-        NLB_IP = "${NLB_IP}"
-        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-      }
-      resources {
-        cpu    = 50
-        memory = 64
-      }
-    }
-  }
-
       config {
         image = "traefik:v3.4.3"
         ports = ["http", "https"]
@@ -275,8 +219,6 @@ EOF
           }
         ]
       }
-
-      # Register traefik-leader service only on leader allocation
       service {
         name = "traefik-${NOMAD_ALLOC_INDEX}"
         port = "http"
@@ -293,92 +235,44 @@ EOF
         enable_tag_override = true
         provider = "nomad"
       }
-
       resources {
         cpu    = 384
         memory = 512
       }
     }
-
-    group "acme-watcher" {
-      count = 1
-      type  = "system"
-
-      task "acme-follower-restart-watcher" {
-        driver = "raw_exec"
-        config {
-          command = "bash"
-          args = ["-c", <<EOT
-  if ! command -v inotifywait >/dev/null 2>&1; then
-    apt-get update && apt-get install -y inotify-tools jq
-  fi
-
-  ACME_DIR="/mnt/glusterfs/traefik"
-  ACME_FILES="acme-prod.json acme-stag.json"
-  DEBOUNCE_SECONDS=60
-
-  while true; do
-    inotifywait -e close_write \$ACME_DIR/\$ACME_FILES
-    echo "\$(date) - Detected change in ACME file(s), restarting follower allocations..."
-
-    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '
-      .[] | select(.TaskGroup==\"traefik\" and .ClientStatus==\"running\" and .AllocatedResources.Shared.Env.NOMAD_ALLOC_INDEX != \"0\") | .ID
-    ' | while read alloc_id; do
-      echo "Restarting follower allocation: \$alloc_id"
-      NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "\$alloc_id"
-    done
-
-    echo "\$(date) - Debouncing for \$DEBOUNCE_SECONDS seconds..."
-    sleep \$DEBOUNCE_SECONDS
-  done
-  EOT
-          ]
-        }
-        env {
-          NLB_IP = "${NLB_IP}"
-          TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-        }
-        resources {
-          cpu    = 50
-          memory = 64
-        }
-      }
-    }
   }
-
 
   group "acme-watcher" {
     count = 1
     type  = "system"
-
     task "acme-follower-restart-watcher" {
       driver = "raw_exec"
       config {
         command = "bash"
         args = ["-c", <<EOT
-  if ! command -v inotifywait >/dev/null 2>&1; then
-    apt-get update && apt-get install -y inotify-tools jq
-  fi
+if ! command -v inotifywait >/dev/null 2>&1; then
+  apt-get update && apt-get install -y inotify-tools jq
+fi
 
-  ACME_DIR="/mnt/glusterfs/traefik"
-  ACME_FILES="acme-prod.json acme-stag.json"
-  DEBOUNCE_SECONDS=60
+ACME_DIR="/mnt/glusterfs/traefik"
+ACME_FILES="acme-prod.json acme-stag.json"
+DEBOUNCE_SECONDS=60
 
-  while true; do
-    inotifywait -e close_write \$ACME_DIR/\$ACME_FILES
-    echo "\$(date) - Detected change in ACME file(s), restarting follower allocations..."
+while true; do
+  inotifywait -e close_write \$ACME_DIR/\$ACME_FILES
+  echo "\$(date) - Detected change in ACME file(s), restarting follower allocations..."
 
-    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '
-      .[] | select(.TaskGroup==\"traefik\" and .ClientStatus==\"running\" and .AllocatedResources.Shared.Env.NOMAD_ALLOC_INDEX != \"0\") | .ID
-    ' | while read alloc_id; do
-      echo "Restarting follower allocation: \$alloc_id"
-      NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "\$alloc_id"
-    done
-
-    echo "\$(date) - Debouncing for \$DEBOUNCE_SECONDS seconds..."
-    sleep \$DEBOUNCE_SECONDS
+  NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad job allocs -json traefik | jq -r '
+    .[] | select(.TaskGroup==\"traefik\" and .ClientStatus==\"running\" and .AllocatedResources.Shared.Env.NOMAD_ALLOC_INDEX != \"0\") | .ID
+  ' | while read alloc_id; do
+    echo "Restarting follower allocation: \$alloc_id"
+    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${TRAEFIK_TOKEN}" nomad alloc restart "\$alloc_id"
   done
-  EOT
+
+  echo "\$(date) - Debouncing for \$DEBOUNCE_SECONDS seconds..."
+  sleep \$DEBOUNCE_SECONDS
+done
+EOT
         ]
       }
       env {
@@ -391,5 +285,4 @@ EOF
       }
     }
   }
-}
 }
