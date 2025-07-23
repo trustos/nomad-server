@@ -244,7 +244,6 @@ EOF
 
   group "acme-watcher" {
     count = 1
-    type  = "system"
     task "acme-follower-restart-watcher" {
       driver = "raw_exec"
       config {
