@@ -63,7 +63,7 @@ job "traefik" {
         command = "bash"
         args = ["-c", <<EOT
 export NOMAD_TOKEN="$TRAEFIK_TOKEN"
-LEADER_IP=$(nomad service info --namespace=traefik -json traefik-leader 2>/dev/null | jq -r '.[] | select(.Tags[]? == "acme-leader") | .Address' | head -n1)
+LEADER_IP=$(nomad service info --namespace=traefik -json traefik-leader 2>/dev/null | jq -r '.[] | select(.Tags[]? == "role=0") | .Address' | head -n1)
 if [ -z "$LEADER_IP" ] || [ "$LEADER_IP" = "null" ]; then
   LEADER_IP="127.0.0.1"
 fi
@@ -210,7 +210,10 @@ EOF
       service {
         name = "traefik-leader"
         port = "http"
-        tags = ["{{ if eq (env \"NOMAD_ALLOC_INDEX\") \"0\" }}acme-leader{{ else }}acme-follower{{ end }}"]
+        tags = [
+          "acme",
+          "role=${NOMAD_ALLOC_INDEX}"
+        ]
         check {
           type     = "http"
           path     = "/ping"
