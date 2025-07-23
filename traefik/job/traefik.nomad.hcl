@@ -91,6 +91,14 @@ EOF
 done
 EOT
         ]
+        mounts = [
+          {
+            type     = "bind"
+            source   = "/mnt/glusterfs/traefik/dynamic"
+            target   = "/mnt/glusterfs/traefik/dynamic"
+            readonly = false
+          }
+        ]
       }
       env {
         TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
@@ -99,17 +107,6 @@ EOT
         cpu    = 10
         memory = 10
       }
-      volume_mount {
-        volume      = "traefik-dynamic"
-        destination = "/mnt/glusterfs/traefik/dynamic"
-        read_only   = false
-      }
-    }
-
-    volume "traefik-dynamic" {
-      type      = "host"
-      source    = "/mnt/glusterfs/traefik/dynamic"
-      read_only = false
     }
 
     task "traefik" {
