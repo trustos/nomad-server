@@ -26,14 +26,6 @@ http:
         - web
       priority: 10000
       service: acme-leader-forward
-      middlewares:
-        - strip-challenge
-
-  middlewares:
-    strip-challenge:
-      stripPrefix:
-        prefixes:
-          - "/.well-known/acme-challenge"
 
   services:
     acme-leader-forward:
