@@ -141,14 +141,12 @@ certificatesResolvers:
       email: "no-reply@example.com"
       storage: /etc/traefik/acme-prod.json
       httpChallenge: {}
-      disableAccountKeyGeneration: true
   cert-stag:
     acme:
       email: "no-reply@example.com"
       storage: /etc/traefik/acme-stag.json
       caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
       httpChallenge: {}
-      disableAccountKeyGeneration: true
 {{ end }}
 
 EOF
