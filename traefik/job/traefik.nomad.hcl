@@ -176,40 +176,7 @@ EOF
       }
     }
 
-    task "init-acme-redirect-template" {
-      driver = "raw_exec"
-      lifecycle {
-        hook = "prestart"
-      }
-      template {
-        data = <<EOF
-http:
-  routers:
-    acme-challenge-redirect:
-      rule: PathPrefix(`/\.well-known/acme-challenge/`)
-      entryPoints:
-        - web
-      priority: 10000
-      service: acme-leader-forward
 
-  services:
-    acme-leader-forward:
-      loadBalancer:
-        servers:
-          - url: "http://traefik-0.service.consul:80"
-EOF
-        destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
-        change_mode = "restart"
-      }
-      config {
-        command = "sleep"
-        args    = ["1"]
-      }
-      resources {
-        cpu    = 10
-        memory = 10
-      }
-    }
   }
 
   group "acme-watcher" {
@@ -263,6 +230,48 @@ EOT
         cpu    = 50
         memory = 64
       }
+    }
+  }
+}
+
+group "acme-redirect-init" {
+  count = 1
+
+  task "init-acme-redirect-template" {
+    driver = "raw_exec"
+    lifecycle {
+      hook = "prestart"
+    }
+    config {
+      command = "bash"
+      args = [
+        "-c",
+        "mkdir -p /mnt/glusterfs/traefik/dynamic && sleep 1"
+      ]
+    }
+    template {
+      data = <<EOF
+http:
+  routers:
+    acme-challenge-redirect:
+      rule: PathPrefix(`/\.well-known/acme-challenge/`)
+      entryPoints:
+        - web
+      priority: 10000
+      service: acme-leader-forward
+
+  services:
+    acme-leader-forward:
+      loadBalancer:
+        servers:
+          - url: "http://traefik-0.service.consul:80"
+EOF
+      destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
+      change_mode = "restart"
+    }
+    resources {
+      cpu    = 5
+      memory = 5
     }
   }
 }
