@@ -270,7 +270,7 @@ EOF
       }
       resources {
         cpu    = 5
-        memory = 5
+        memory = 10
       }
     }
   }
