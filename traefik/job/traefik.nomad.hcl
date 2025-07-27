@@ -232,25 +232,24 @@ EOT
       }
     }
   }
-}
 
-group "acme-redirect-init" {
-  count = 1
+  group "acme-redirect-init" {
+    count = 1
 
-  task "init-acme-redirect-template" {
-    driver = "raw_exec"
-    lifecycle {
-      hook = "prestart"
-    }
-    config {
-      command = "bash"
-      args = [
-        "-c",
-        "mkdir -p /mnt/glusterfs/traefik/dynamic && sleep 1"
-      ]
-    }
-    template {
-      data = <<EOF
+    task "init-acme-redirect-template" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "bash"
+        args = [
+          "-c",
+          "mkdir -p /mnt/glusterfs/traefik/dynamic && sleep 1"
+        ]
+      }
+      template {
+        data = <<EOF
 http:
   routers:
     acme-challenge-redirect:
@@ -266,12 +265,12 @@ http:
         servers:
           - url: "http://traefik-0.service.consul:80"
 EOF
-      destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
-      change_mode = "restart"
-    }
-    resources {
-      cpu    = 5
-      memory = 5
+        destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
+        change_mode = "restart"
+      }
+      resources {
+        cpu    = 5
+        memory = 5
+      }
     }
   }
-}
