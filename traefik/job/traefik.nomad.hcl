@@ -2,71 +2,7 @@ job "traefik" {
   namespace = "traefik"
   datacenters = ["dc1"]
 
-  group "acme-redirect-cron" {
-    count = 1
 
-    task "acme-redirect-cron" {
-      driver = "raw_exec"
-      config {
-        command = "bash"
-        args = ["-c", <<EOT
-FIRST_FOUND=0
-DYNAMIC_CONFIG_PATH="/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
-
-while true; do
-  TS="$(date '+%Y-%m-%d %H:%M:%S')"
-  SERVICE_INFO=$(NOMAD_TOKEN="$TRAEFIK_TOKEN" nomad service info --namespace=traefik -json traefik-0 2>/dev/null)
-  LEADER_IP=$(echo "$SERVICE_INFO" | jq -r '.[0].Address')
-  ROLE=$(echo "$SERVICE_INFO" | jq -r '.[0].Tags[]' | grep '^role=' | cut -d= -f2)
-
-  echo "$TS - Raw leader IP: $LEADER_IP, role tag: $ROLE"
-
-  if [ -n "$LEADER_IP" ] && [ "$LEADER_IP" != "null" ] && [ "$ROLE" = "0" ]; then
-    echo "$TS - Cron: Using leader IP: $LEADER_IP (confirmed role=0)"
-    cat > "$DYNAMIC_CONFIG_PATH" <<EOF
-http:
-  routers:
-    acme-challenge-redirect:
-      rule: PathPrefix(\`/.well-known/acme-challenge/\`)
-      entryPoints:
-        - web
-      priority: 10000
-      service: acme-leader-forward
-
-  services:
-    acme-leader-forward:
-      loadBalancer:
-        servers:
-          - url: "http://$LEADER_IP:80"
-EOF
-    FIRST_FOUND=1
-  else
-    echo "$TS - Leader IP not found or not role=0, will retry soon."
-    if [ "$FIRST_FOUND" -eq 0 ] && [ -f "$DYNAMIC_CONFIG_PATH" ]; then
-      rm -f "$DYNAMIC_CONFIG_PATH"
-      echo "$TS - Removed stale dynamic config."
-    fi
-  fi
-
-  if [ "$FIRST_FOUND" -eq 1 ]; then
-    sleep 300
-  else
-    sleep 10
-  fi
-done
-EOT
-        ]
-      }
-      env {
-        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-        NOMAD_ADDR    = "http://${NLB_IP}:4646"
-      }
-      resources {
-        cpu    = 200
-        memory = 128
-      }
-    }
-  }
 
   group "traefik" {
     count = 2
@@ -189,6 +125,29 @@ EOF
         destination = "local/traefik.yaml"
         change_mode = "restart"
       }
+
+      # Template for ACME challenge redirect dynamic config
+      template {
+        data = <<EOF
+http:
+  routers:
+    acme-challenge-redirect:
+      rule: PathPrefix(`/\.well-known/acme-challenge/`)
+      entryPoints:
+        - web
+      priority: 10000
+      service: acme-leader-forward
+
+  services:
+    acme-leader-forward:
+      loadBalancer:
+        servers:
+          - url: "http://traefik-0.service.consul:80"
+EOF
+        destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
+        change_mode = "restart"
+      }
+
       config {
         image = "traefik:v3.4.3"
         ports = ["http", "https"]
@@ -233,7 +192,6 @@ EOF
           timeout  = "2s"
         }
         enable_tag_override = true
-        provider = "nomad"
       }
       resources {
         cpu    = 384
