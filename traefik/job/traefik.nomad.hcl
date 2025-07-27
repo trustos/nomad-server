@@ -124,31 +124,7 @@ certificatesResolvers:
 EOF
         destination = "local/traefik.yaml"
         change_mode = "restart"
-        # Template for ACME challenge redirect dynamic config (group-level)
-        template {
-          data = <<EOF
-    http:
-      routers:
-        acme-challenge-redirect:
-          rule: PathPrefix(`/\.well-known/acme-challenge/`)
-          entryPoints:
-            - web
-          priority: 10000
-          service: acme-leader-forward
-
-      services:
-        acme-leader-forward:
-          loadBalancer:
-            servers:
-              - url: "http://traefik-0.service.consul:80"
-    EOF
-          destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
-          change_mode = "restart"
-        }
       }
-
-
-
       config {
         image = "traefik:v3.4.3"
         ports = ["http", "https"]
@@ -197,6 +173,41 @@ EOF
       resources {
         cpu    = 384
         memory = 512
+      }
+    }
+
+    task "init-acme-redirect-template" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      template {
+        data = <<EOF
+http:
+  routers:
+    acme-challenge-redirect:
+      rule: PathPrefix(`/\.well-known/acme-challenge/`)
+      entryPoints:
+        - web
+      priority: 10000
+      service: acme-leader-forward
+
+  services:
+    acme-leader-forward:
+      loadBalancer:
+        servers:
+          - url: "http://traefik-0.service.consul:80"
+EOF
+        destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
+        change_mode = "restart"
+      }
+      config {
+        command = "sleep"
+        args    = ["1"]
+      }
+      resources {
+        cpu    = 5
+        memory = 5
       }
     }
   }
