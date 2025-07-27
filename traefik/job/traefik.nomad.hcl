@@ -206,8 +206,8 @@ EOF
         args    = ["1"]
       }
       resources {
-        cpu    = 5
-        memory = 5
+        cpu    = 10
+        memory = 10
       }
     }
   }
