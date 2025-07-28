@@ -57,13 +57,12 @@ job "traefik" {
       }
       config {
         command = "bash"
-        args = [
-          "-c",
-          "cat <<EOF > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
+        args = [<<EOT
+cat <<EOF > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
 http:
   routers:
     acme-challenge-redirect:
-      rule: PathPrefix(`/\\.well-known/acme-challenge/`)
+      rule: PathPrefix(`/\.well-known/acme-challenge/`)
       entryPoints:
         - web
       priority: 10000
@@ -73,9 +72,9 @@ http:
     acme-leader-forward:
       loadBalancer:
         servers:
-          - url: \"http://traefik-0.service.consul:80\"
+          - url: "http://traefik-0.service.consul:80"
 EOF
-"
+EOT
         ]
       }
       resources {
