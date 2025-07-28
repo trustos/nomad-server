@@ -58,6 +58,10 @@ job "traefik" {
       config {
         command = "bash"
         args = [<<EOT
+echo "DEBUG: Running as user: $(whoami)"
+echo "DEBUG: Directory listing for /mnt/glusterfs/traefik/dynamic:"
+ls -ld /mnt/glusterfs/traefik/dynamic
+echo "DEBUG: Attempting to write acme-redirect.yaml..."
 cat <<EOF > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
 http:
   routers:
