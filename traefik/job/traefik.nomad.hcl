@@ -125,7 +125,6 @@ providers:
     directory: "/etc/traefik/dynamic"
     watch: true
   nomad:
-    exposedByDefault: true
     endpoint:
       address: "http://nomad.service.consul:4646"
       token: "${TRAEFIK_TOKEN}"
@@ -133,9 +132,9 @@ providers:
     namespaces:
       - "nomad-ops"
       - "default"
-    consul:
-      endpoints:
-        - "consul.service.consul:8500"
+  consul:
+    endpoints:
+      - "consul.service.consul:8500"
 
 certificatesResolvers:
 {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}
