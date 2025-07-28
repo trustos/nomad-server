@@ -105,12 +105,6 @@ entryPoints:
     {{ if ne (env "NOMAD_ALLOC_INDEX") "0" }}
     allowACMEByPass: true
     {{ end }}
-    http:
-      redirections:
-        entryPoint:
-          to: websecure
-          scheme: https
-          permanent: true
 
   websecure:
     address: ":443"
