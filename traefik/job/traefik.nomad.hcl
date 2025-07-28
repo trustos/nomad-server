@@ -50,13 +50,15 @@ job "traefik" {
       }
     }
 
-    task "traefik" {
-      driver = "docker"
-      env {
-        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-        NLB_IP = "${NLB_IP}"
+    task "render-acme-redirect" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
       }
-
+      config {
+        command = "sleep"
+        args    = ["1"]
+      }
       template {
         data = <<EOF
 http:
@@ -74,9 +76,23 @@ http:
         servers:
           - url: "http://traefik-0.service.consul:80"
 EOF
-        destination = "local/dynamic/acme-redirect.yaml"
+        destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
         change_mode = "restart"
       }
+      resources {
+        cpu    = 10
+        memory = 10
+      }
+    }
+
+    task "traefik" {
+      driver = "docker"
+      env {
+        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
+        NLB_IP = "${NLB_IP}"
+      }
+
+
 
       template {
         data = <<EOF
