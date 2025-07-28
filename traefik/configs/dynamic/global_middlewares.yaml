@@ -1,0 +1,14 @@
+http:
+  middlewares:
+    auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$KzvsOq/Z$eHMKLFirJZCV0NlQd33GO/"
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50

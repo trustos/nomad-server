@@ -1,10 +1,4 @@
 http:
-  middlewares:
-    auth:
-      basicAuth:
-        users:
-          - "admin:$apr1$KzvsOq/Z$eHMKLFirJZCV0NlQd33GO/"
-
   routers:
     dashboard:
       rule: "Host(`traefik.local`)"
