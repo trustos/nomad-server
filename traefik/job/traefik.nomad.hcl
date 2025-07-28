@@ -68,7 +68,7 @@ cat <<'EOF' > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
 http:
   routers:
     acme-challenge-redirect:
-      rule: PathPrefix(`/\.well-known/acme-challenge/`)
+      rule: PathPrefix(\`/.well-known/acme-challenge/\`)
       entryPoints:
         - web
       priority: 10000
