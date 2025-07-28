@@ -57,7 +57,9 @@ job "traefik" {
       }
       config {
         command = "bash"
-        args = [<<EOT
+        args = [
+          "-c",
+          <<EOT
 echo "DEBUG: Running as user: $(whoami)"
 echo "DEBUG: Directory listing for /mnt/glusterfs/traefik/dynamic:"
 ls -ld /mnt/glusterfs/traefik/dynamic
