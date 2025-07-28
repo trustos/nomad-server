@@ -133,6 +133,9 @@ providers:
     namespaces:
       - "nomad-ops"
       - "default"
+    consul:
+      endpoints:
+        - "consul.service.consul:8500"
 
 certificatesResolvers:
 {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}
