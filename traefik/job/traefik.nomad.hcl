@@ -76,7 +76,6 @@ http:
 EOF
         destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
         change_mode = "restart"
-        condition = "${NOMAD_ALLOC_INDEX} == 0"
       }
 
       template {
