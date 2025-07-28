@@ -45,18 +45,14 @@ job "nomad-ops" {
         "http",
         "view",
         "traefik.enable=true",
-        "traefik.http.routers.nomadops-local.rule=Host(`nomadops.local`)",
-        "traefik.http.routers.nomadops-local.entrypoints=web",
-        "traefik.http.routers.nomadops-inet.rule=Host(`nomad-ops.rs-estates.com`)",
+        "traefik.http.routers.nomadops-inet.rule=Host(`ops.nomad.rs-estates.com`)",
         "traefik.http.routers.nomadops-inet.entrypoints=web,websecure",
+        "traefik.http.routers.nomadops-inet.middlewares=auth@file",
         "traefik.http.routers.nomadops-inet.tls=true",
         "traefik.http.routers.nomadops-inet.tls.certresolver=cert-stag",
       ]
 
       port = "http"
-
-      # comment to use consul
-      provider = "nomad"
 
       check {
         type     = "http"

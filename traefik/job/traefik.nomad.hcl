@@ -93,7 +93,6 @@ EOT
       driver = "docker"
       env {
         TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-        NLB_IP = "${NLB_IP}"
       }
 
 
@@ -106,6 +105,12 @@ entryPoints:
     {{ if ne (env "NOMAD_ALLOC_INDEX") "0" }}
     allowACMEByPass: true
     {{ end }}
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
 
   websecure:
     address: ":443"
@@ -126,13 +131,14 @@ providers:
     directory: "/etc/traefik/dynamic"
     watch: true
   nomad:
-      endpoint:
-        address: "http://${NLB_IP}:4646"
-        token: "${TRAEFIK_TOKEN}"
-      watch: true
-      namespaces:
-        - "nomad-ops"
-        - "default"
+    exposedByDefault: true
+    endpoint:
+      address: "http://nomad.service.consul:4646"
+      token: "${TRAEFIK_TOKEN}"
+    watch: true
+    namespaces:
+      - "nomad-ops"
+      - "default"
 
 certificatesResolvers:
 {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}
@@ -239,9 +245,9 @@ while true; do
   inotifywait -e close_write $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json
   echo "$(date) - Detected change in ACME file(s), restarting follower allocations..."
 
-  NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID' | while read alloc_id; do
+  NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID' | while read alloc_id; do
     echo "Restarting follower allocation: $alloc_id"
-    NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id"
+    NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id"
   done
 
   # Coalesce further events during debounce window
@@ -249,9 +255,9 @@ while true; do
     inotifywait -t $DEBOUNCE_SECONDS -e close_write $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json
     if [ $? -eq 0 ]; then
       echo "$(date) - Additional ACME file change detected during debounce, restarting follower allocations..."
-      NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID' | while read alloc_id; do
+      NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID' | while read alloc_id; do
         echo "Restarting follower allocation: $alloc_id"
-        NOMAD_ADDR="http://${NLB_IP}:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id"
+        NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id"
       done
       echo "$(date) - Debouncing for $DEBOUNCE_SECONDS seconds..."
       # Loop again to coalesce further events
@@ -265,7 +271,6 @@ EOT
         ]
       }
       env {
-        NLB_IP = "${NLB_IP}"
         MGMT_TOKEN = "${MGMT_TOKEN}"
       }
       resources {
