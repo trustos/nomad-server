@@ -74,7 +74,7 @@ http:
         servers:
           - url: "http://traefik-0.service.consul:80"
 EOF
-        destination = "/mnt/glusterfs/traefik/dynamic/acme-redirect.yaml"
+        destination = "local/dynamic/acme-redirect.yaml"
         change_mode = "restart"
       }
 
