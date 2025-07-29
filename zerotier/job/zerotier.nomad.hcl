@@ -64,20 +64,16 @@ EOT
           <<EOT
 set -e
 
-# --- Wait for ZeroTier interface and IP ---
-for i in {1..30}; do
+# --- Wait for ZeroTier interface and IP (may require manual approval) ---
+while true; do
   ZT_IFACE=$(ip -o -4 addr show | awk '$2 ~ /^zt/ {print $2; exit}')
   ZT_IP=$(ip -o -4 addr show | awk '$2 ~ /^zt/ {print $4; exit}' | cut -d/ -f1)
   if [ -n "$ZT_IFACE" ] && [ -n "$ZT_IP" ]; then
     break
   fi
-  echo "Waiting for ZeroTier interface and IP..."
-  sleep 2
+  echo "Waiting for ZeroTier interface and IP (this may require manual approval in the ZeroTier admin console)..."
+  sleep 10
 done
-if [ -z "$ZT_IFACE" ] || [ -z "$ZT_IP" ]; then
-  echo "ZeroTier interface or IP not found!"
-  exit 1
-fi
 
 # --- Wait for Traefik container and get its bridge IP ---
 for i in {1..30}; do
