@@ -44,12 +44,20 @@ job "nomad-ops" {
       tags = [
         "http",
         "view",
+        //Enable this service in Traefik
         "traefik.enable=true",
-        "traefik.http.routers.nomadops-inet.rule=Host(`ops.nomad.rs-estates.com`)",
-        "traefik.http.routers.nomadops-inet.entrypoints=web,websecure",
-        "traefik.http.routers.nomadops-inet.middlewares=auth@file",
-        "traefik.http.routers.nomadops-inet.tls=true",
-        "traefik.http.routers.nomadops-inet.tls.certresolver=cert-stag",
+
+        // Define the http router for the service
+        "traefik.http.routers.nomadops.rule=Host(`ops.nomad.rs-estates.com`)",
+        "traefik.http.routers.nomadops.entrypoints=web",
+        "traefik.http.routers.nomadops.middlewares=redirect-to-https@file",
+
+        // Define the secure https router for the service
+        "traefik.http.routers.nomadops-secure.rule=Host(`ops.nomad.rs-estates.com`)",
+        "traefik.http.routers.nomadops-secure.entrypoints=websecure",
+        "traefik.http.routers.nomadops-secure.middlewares=auth@file",
+        "traefik.http.routers.nomadops-secure.tls=true",
+        "traefik.http.routers.nomadops-secure.tls.certresolver=cert-stag",
       ]
 
       port = "http"
