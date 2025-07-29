@@ -135,7 +135,6 @@ providers:
   consulCatalog:
     endpoint:
         address: "consul.service.consul:8500"
-    exposedByDefault: true
 
 certificatesResolvers:
 {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}
@@ -232,37 +231,60 @@ EOF
         command = "bash"
         args = ["-c", <<EOT
 ACME_DIR="/mnt/glusterfs/traefik"
+ACME_FILES=("$ACME_DIR/acme-prod.json" "$ACME_DIR/acme-stag.json")
 DEBOUNCE_SECONDS=60
+POLL_INTERVAL=10
+
+declare -A LAST_HASH
+
+for file in "${ACME_FILES[@]}"; do
+  if [ -f "$file" ]; then
+    LAST_HASH["$file"]=$(md5sum "$file" | awk '{print $1}')
+  else
+    LAST_HASH["$file"]=""
+  fi
+done
 
 while true; do
-  echo "Watching: $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json"
-  ls -l $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json
-
-  # Wait for the first event
-  inotifywait -e close_write $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json
-  echo "$(date) - Detected change in ACME file(s), restarting follower allocations..."
-
-  NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID' | while read alloc_id; do
-    echo "Restarting follower allocation: $alloc_id"
-    NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id"
-  done
-
-  # Coalesce further events during debounce window
-  while true; do
-    inotifywait -t $DEBOUNCE_SECONDS -e close_write $ACME_DIR/acme-prod.json $ACME_DIR/acme-stag.json
-    if [ $? -eq 0 ]; then
-      echo "$(date) - Additional ACME file change detected during debounce, restarting follower allocations..."
-      NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID' | while read alloc_id; do
-        echo "Restarting follower allocation: $alloc_id"
-        NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id"
-      done
-      echo "$(date) - Debouncing for $DEBOUNCE_SECONDS seconds..."
-      # Loop again to coalesce further events
+  CHANGED=0
+  for file in "${ACME_FILES[@]}"; do
+    if [ -f "$file" ]; then
+      NEW_HASH=$(md5sum "$file" | awk '{print $1}')
+      if [ "${LAST_HASH["$file"]}" != "$NEW_HASH" ]; then
+        echo "$(date) - Detected change in $file, restarting follower allocations..."
+        LAST_HASH["$file"]="$NEW_HASH"
+        CHANGED=1
+      fi
     else
-      # Timeout expired, break to outer loop
-      break
+      echo "$(date) - WARNING: $file does not exist!"
     fi
   done
+
+  if [ $CHANGED -eq 1 ]; then
+    NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik 2>&1)
+    echo "NOMAD job allocs output:"
+    echo "$NOMAD_ALLOCS_JSON"
+
+    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID')
+    echo "Follower allocation IDs to restart:"
+    echo "$ALLOC_IDS"
+
+    for alloc_id in $ALLOC_IDS; do
+      echo "Restarting follower allocation: $alloc_id"
+      RESTART_OUTPUT=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id" 2>&1)
+      RESTART_EXIT_CODE=$?
+      echo "Restart output for $alloc_id:"
+      echo "$RESTART_OUTPUT"
+      if [ $RESTART_EXIT_CODE -ne 0 ]; then
+        echo "ERROR: Failed to restart allocation $alloc_id (exit code $RESTART_EXIT_CODE)"
+      fi
+    done
+
+    echo "$(date) - Debouncing for $DEBOUNCE_SECONDS seconds..."
+    sleep $DEBOUNCE_SECONDS
+  else
+    sleep $POLL_INTERVAL
+  fi
 done
 EOT
         ]
