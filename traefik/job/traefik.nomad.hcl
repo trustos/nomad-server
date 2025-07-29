@@ -231,34 +231,47 @@ EOF
         command = "bash"
         args = ["-c", <<EOT
 ACME_DIR="/mnt/glusterfs/traefik"
-ACME_FILES=("$ACME_DIR/acme-prod.json" "$ACME_DIR/acme-stag.json")
+ACME_FILE1="$ACME_DIR/acme-prod.json"
+ACME_FILE2="$ACME_DIR/acme-stag.json"
 DEBOUNCE_SECONDS=60
 POLL_INTERVAL=10
 
-declare -A LAST_HASH
+if [ -f "$ACME_FILE1" ]; then
+  LAST_HASH1=$(md5sum "$ACME_FILE1" | awk '{print $1}')
+else
+  LAST_HASH1=""
+fi
 
-for file in "${ACME_FILES[@]}"; do
-  if [ -f "$file" ]; then
-    LAST_HASH["$file"]=$(md5sum "$file" | awk '{print $1}')
-  else
-    LAST_HASH["$file"]=""
-  fi
-done
+if [ -f "$ACME_FILE2" ]; then
+  LAST_HASH2=$(md5sum "$ACME_FILE2" | awk '{print $1}')
+else
+  LAST_HASH2=""
+fi
 
 while true; do
   CHANGED=0
-  for file in "${ACME_FILES[@]}"; do
-    if [ -f "$file" ]; then
-      NEW_HASH=$(md5sum "$file" | awk '{print $1}')
-      if [ "${LAST_HASH["$file"]}" != "$NEW_HASH" ]; then
-        echo "$(date) - Detected change in $file, restarting follower allocations..."
-        LAST_HASH["$file"]="$NEW_HASH"
-        CHANGED=1
-      fi
-    else
-      echo "$(date) - WARNING: $file does not exist!"
+
+  if [ -f "$ACME_FILE1" ]; then
+    NEW_HASH1=$(md5sum "$ACME_FILE1" | awk '{print $1}')
+    if [ "$LAST_HASH1" != "$NEW_HASH1" ]; then
+      echo "$(date) - Detected change in $ACME_FILE1, restarting follower allocations..."
+      LAST_HASH1="$NEW_HASH1"
+      CHANGED=1
     fi
-  done
+  else
+    echo "$(date) - WARNING: $ACME_FILE1 does not exist!"
+  fi
+
+  if [ -f "$ACME_FILE2" ]; then
+    NEW_HASH2=$(md5sum "$ACME_FILE2" | awk '{print $1}')
+    if [ "$LAST_HASH2" != "$NEW_HASH2" ]; then
+      echo "$(date) - Detected change in $ACME_FILE2, restarting follower allocations..."
+      LAST_HASH2="$NEW_HASH2"
+      CHANGED=1
+    fi
+  else
+    echo "$(date) - WARNING: $ACME_FILE2 does not exist!"
+  fi
 
   if [ $CHANGED -eq 1 ]; then
     NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik 2>&1)
