@@ -135,6 +135,7 @@ providers:
   consulCatalog:
     endpoint:
         address: "consul.service.consul:8500"
+    watch: true
 
 certificatesResolvers:
 {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}

@@ -1,0 +1,15 @@
+http:
+  routers:
+    nomad-ui:
+      rule: "Host(`nomad.rs-estates`)"
+      entryPoints:
+        - "websecure"
+      service: nomad-ui
+      middlewares:
+        - "auth"
+
+  services:
+    nomad-ui:
+      loadBalancer:
+        servers:
+          - url: "http://nomad.service.consul:4646"
