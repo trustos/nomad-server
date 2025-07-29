@@ -12,6 +12,8 @@ job "traefik" {
     }
 
     network {
+      mode = "host"
+
       port "http" {
         static = 80
       }
