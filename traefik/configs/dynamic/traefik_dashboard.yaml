@@ -3,7 +3,7 @@ http:
     dashboard:
       rule: "Host(`traefik.rs-estates`)"
       entryPoints:
-        - "websecure"
+        - "web"
       service: api@internal
       middlewares:
         - "auth"

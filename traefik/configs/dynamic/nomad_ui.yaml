@@ -3,7 +3,7 @@ http:
     nomad-ui:
       rule: "Host(`nomad.rs-estates`)"
       entryPoints:
-        - "websecure"
+        - "web"
       service: nomad-ui
       middlewares:
         - "auth"
