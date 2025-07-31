@@ -1,15 +1,11 @@
 job "traefik" {
+  type = "system"
   namespace = "traefik"
   datacenters = ["dc1"]
 
 
 
   group "traefik" {
-    count = 2
-
-    constraint {
-      distinct_hosts = true
-    }
 
     network {
       port "http" {
