@@ -51,6 +51,10 @@ job "nomad-ops" {
         "traefik.http.routers.nomadops.rule=Host(`ops.rs-estates`)",
         "traefik.http.routers.nomadops.entrypoints=web",
         "traefik.http.routers.nomadops.middlewares=auth@file",
+
+        // Define the http service for the api
+        "traefik.http.routers.nomadops-api.rule=Host(`ops.rs-estates`) && PathPrefix(`/api`)",
+        "traefik.http.routers.nomadops-api.entrypoints=web",
       ]
 
       port = "http"
