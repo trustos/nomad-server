@@ -66,8 +66,8 @@ job "postgres-stack" {
         port = "db"
         tags = [
           "traefik.enable=true",
-          "traefik.tcp.routers.pg.rule=Host(`pg.rs-estates`)",
-          "traefik.tcp.routers.pg.entrypoints=web",
+          "traefik.http.routers.pg.rule=Host(`pg.rs-estates`)",
+          "traefik.http.routers.pg.entrypoints=web",
         ]
       }
     }
