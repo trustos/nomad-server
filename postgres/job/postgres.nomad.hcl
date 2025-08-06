@@ -29,7 +29,7 @@ job "postgres-stack" {
 
     network {
       port "db" {
-        to = 5432
+        static = 5432
       }
     }
 
