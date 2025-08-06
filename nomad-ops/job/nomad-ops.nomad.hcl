@@ -33,6 +33,43 @@ job "nomad-ops" {
       }
     }
 
+    task "init-secrets" {
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "raw_exec"
+
+      config {
+        command = "bash"
+        args = [
+          "-c",
+          <<-EOT
+          #!/bin/bash
+          set -e
+
+          # Check and set DEFAULT_USER_EMAIL
+          if ! consul kv get nomad-ops/adminuseremail > /dev/null 2>&1; then
+            useremail="admin@nomad-ops.rs-estates"
+            consul kv put nomad-ops/adminuseremail "$user"
+          fi
+
+          # Check and set DEFAULT_USER_PASSWORD
+          if ! consul kv get nomad-ops/adminpassword > /dev/null 2>&1; then
+            pw=$(openssl rand -base64 24)
+            consul kv put nomad-ops/adminpassword "$pw"
+          fi
+          EOT
+        ]
+      }
+
+      resources {
+        cpu    = 100
+        memory = 64
+      }
+    }
+
     network {
       port "http" {
         to = 8080
@@ -83,6 +120,16 @@ job "nomad-ops" {
 
         # Expose Workload Identity in ${NOMAD_SECRETS_DIR}/nomad_token file
         file = true
+      }
+
+      template {
+         data = <<EOH
+     DEFAULT_USER_EMAIL={{ key "nomad-ops/adminuseremail" }}
+     DEFAULT_USER_PASSWORD={{ key "nomad-ops/adminpassword" }}
+     EOH
+
+         destination = "secrets/env"
+         env         = true
       }
 
       env {

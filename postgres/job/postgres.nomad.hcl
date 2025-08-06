@@ -107,7 +107,7 @@ job "postgres-stack" {
 
          destination = "secrets/env"
          env         = true
-       }
+      }
 
       resources {
         cpu    = 500
