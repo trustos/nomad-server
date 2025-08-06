@@ -1,0 +1,15 @@
+http:
+  routers:
+    consul-ui:
+      rule: "Host(`consul.rs-estates`)"
+      entryPoints:
+        - "web"
+      service: consul-ui
+      middlewares:
+        - "auth" # Optional: use your existing basic auth middleware
+
+  services:
+    consul-ui:
+      loadBalancer:
+        servers:
+          - url: "http://consul.service.consul:8500"

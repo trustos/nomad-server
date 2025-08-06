@@ -3,7 +3,7 @@ http:
     auth:
       basicAuth:
         users:
-          - "admin:$apr1$KzvsOq/Z$eHMKLFirJZCV0NlQd33GO/"
+          - "rs-estates:$apr1$QwErTyUi$9z8x7w6v5u4t3r2q1p0oM/"
     redirect-to-https:
       redirectScheme:
         scheme: https
