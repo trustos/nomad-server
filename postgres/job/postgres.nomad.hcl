@@ -78,7 +78,7 @@ job "postgres-stack" {
 
     network {
       port "http" {
-        to = 8080
+        to = 80
       }
     }
 
