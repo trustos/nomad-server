@@ -53,7 +53,6 @@ job "postgres-stack" {
       env {
         POSTGRES_USER     = "nomaduser"
         POSTGRES_PASSWORD = "securepassword"
-        POSTGRES_DB       = "nomaddb"
       }
 
       resources {
