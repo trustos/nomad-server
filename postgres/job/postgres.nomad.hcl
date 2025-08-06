@@ -27,6 +27,55 @@ job "postgres-stack" {
       }
     }
 
+    task "init-secrets" {
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "raw_exec"
+
+      config {
+        command = "bash"
+        args = [
+          "-c",
+          <<-EOT
+          #!/bin/bash
+          set -e
+
+          # Check and set POSTGRES_USER
+          if ! consul kv get postgres/adminuser > /dev/null 2>&1; then
+            user="adminuser"
+            consul kv put postgres/adminuser "$user"
+          fi
+
+          # Check and set POSTGRES_PASSWORD
+          if ! consul kv get postgres/adminpassword > /dev/null 2>&1; then
+            pw=$(openssl rand -base64 24)
+            consul kv put postgres/adminpassword "$pw"
+          fi
+
+          # Check and set PGADMIN_DEFAULT_EMAIL
+          if ! consul kv get postgres/pgadminuser > /dev/null 2>&1; then
+            user="adminuser"
+            consul kv put postgres/pgadminuser "$user"
+          fi
+
+          # Check and set PGADMIN_DEFAULT_PASSWORD
+          if ! consul kv get postgres/pgadminpassword > /dev/null 2>&1; then
+            pw=$(openssl rand -base64 24)
+            consul kv put postgres/pgadminpassword "$pw"
+          fi
+          EOT
+        ]
+      }
+
+      resources {
+        cpu    = 100
+        memory = 64
+      }
+    }
+
     network {
       port "db" {
         static = 5432
@@ -50,10 +99,15 @@ job "postgres-stack" {
         ]
       }
 
-      env {
-        POSTGRES_USER     = "nomaduser"
-        POSTGRES_PASSWORD = "securepassword"
-      }
+      template {
+         data = <<EOH
+     POSTGRES_USER={{ key "postgres/adminuser" }}
+     POSTGRES_PASSWORD={{ key "postgres/adminpassword" }}
+     EOH
+
+         destination = "secrets/env"
+         env         = true
+       }
 
       resources {
         cpu    = 500
@@ -98,10 +152,15 @@ job "postgres-stack" {
         ]
       }
 
-      env {
-        PGADMIN_DEFAULT_EMAIL    = "admin@example.com"
-        PGADMIN_DEFAULT_PASSWORD = "adminpass"
-      }
+      template {
+         data = <<EOH
+     PGADMIN_DEFAULT_EMAIL={{ key "postgres/pgadminuser" }}
+     PGADMIN_DEFAULT_PASSWORD={{ key "postgres/pgadminpassword" }}
+     EOH
+
+         destination = "secrets/env"
+         env         = true
+       }
 
       resources {
         cpu    = 300
