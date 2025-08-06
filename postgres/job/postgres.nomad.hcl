@@ -29,7 +29,7 @@ job "postgres-stack" {
 
     network {
       port "db" {
-        static = 5432
+        to = 5432
       }
     }
 
@@ -60,6 +60,16 @@ job "postgres-stack" {
         cpu    = 500
         memory = 512
       }
+
+      service {
+        name = "postgres"
+        port = "db"
+        tags = [
+          "traefik.enable=true",
+          "traefik.tcp.routers.pg.rule=Host(`pg.rs-estates`)",
+          "traefik.tcp.routers.pg.entrypoints=web",
+        ]
+      }
     }
   }
 
@@ -68,7 +78,7 @@ job "postgres-stack" {
 
     network {
       port "http" {
-        static = 8080
+        to = 8080
       }
     }
 
@@ -97,6 +107,16 @@ job "postgres-stack" {
       resources {
         cpu    = 300
         memory = 256
+      }
+
+      service {
+        name = "pgadmin"
+        port = "http"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.pgadmin.rule=Host(`pgadmin.rs-estates`)",
+          "traefik.http.routers.pgadmin.entrypoints=web",
+        ]
       }
     }
   }
