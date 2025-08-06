@@ -17,10 +17,7 @@ job "postgres-stack" {
         command = "bash"
         args = [
           "-c",
-          "mkdir -p /mnt/glusterfs/postgres/data16 && \
-           mkdir -p /mnt/glusterfs/postgres/pgadmin && \
-           chown -R 999:999 /mnt/glusterfs/postgres/data16 && \
-           chown -R 5050:5050 /mnt/glusterfs/postgres/pgadmin"
+          "mkdir -p /mnt/glusterfs/postgres/data16 && mkdir -p /mnt/glusterfs/postgres/pgadmin && chown -R 999:999 /mnt/glusterfs/postgres/data16 && chown -R 5050:5050 /mnt/glusterfs/postgres/pgadmin"
         ]
       }
 
