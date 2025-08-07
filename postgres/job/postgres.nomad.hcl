@@ -76,14 +76,6 @@ job "postgres-stack" {
       }
     }
 
-    task "create-postgres-namespace" {
-      driver = "raw_exec"
-
-      lifecycle {
-        hook    = "prestart"
-        sidecar = false
-      }
-
     network {
       port "db" {
         static = 5432
