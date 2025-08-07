@@ -135,7 +135,20 @@ job "postgres-stack" {
       }
     }
 
-
+    task "prepare-pgadmin-dir" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "mkdir"
+        args    = ["-p", "/mnt/glusterfs/postgres/pgadmin"]
+      }
+      resources {
+        cpu    = 50
+        memory = 32
+      }
+    }
 
     task "pgadmin" {
       driver = "docker"
