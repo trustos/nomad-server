@@ -98,6 +98,7 @@ job "postgres-stack" {
         args = [
           "-c",
           "NOMAD_TOKEN=$NOMAD_TOKEN nomad apply namespace --description='Postgres namespace' postgres"
+        ]
       }
 
       resources {
