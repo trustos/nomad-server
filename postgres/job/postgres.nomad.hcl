@@ -173,8 +173,8 @@ EOH
       "Host": "pg.rs-estates",
       "Port": 5432,
       "MaintenanceDB": "postgres",
-      "Username": "{{ key \"postgres/adminuser\" }}",
-      "Password": "{{ key \"postgres/adminpassword\" }}",
+      "Username": "{{ key "postgres/adminuser" }}",
+      "Password": "{{ key "postgres/adminpassword" }}",
       "SSLMode": "prefer"
     }
   }
