@@ -52,7 +52,7 @@ job "nomad-ops" {
           # Check and set DEFAULT_USER_EMAIL
           if ! consul kv get nomad-ops/adminuseremail > /dev/null 2>&1; then
             useremail="admin@nomad-ops.rs-estates"
-            consul kv put nomad-ops/adminuseremail "$user"
+            consul kv put nomad-ops/adminuseremail "$useremail"
           fi
 
           # Check and set DEFAULT_USER_PASSWORD
