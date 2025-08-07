@@ -135,60 +135,31 @@ job "postgres-stack" {
       }
     }
 
-    # This prestart task creates the config file and sets the correct ownership
-    # before the main pgadmin task starts.
-    task "setup-pgadmin-config" {
-          lifecycle {
-            hook    = "prestart"
-            sidecar = false
-          }
 
-          driver = "raw_exec"
-
-          # This template now lives in the prestart task.
-          # It writes the file directly to the shared volume.
-          template {
-            data = <<EOH
-    {
-      "Servers": {
-        "1": {
-          "Name": "Postgres (Nomad)",
-          "Group": "Servers",
-          # CORRECTED: Use the stable Consul DNS name to avoid the startup race condition.
-          # This assumes your datacenter is "dc1" as defined in the job file.
-          "Host": "postgres.service.consul",
-          # The port is defined as static in the postgres task, so we can use it directly.
-          "Port": 5432,
-          "MaintenanceDB": "postgres",
-          "Username": {{ key "postgres/adminuser" }},
-          "Password": {{ key "postgres/adminpassword" }},
-          "SSLMode": "prefer"
-        }
-      }
-    }
-    EOH
-            # Note: This destination is a path on the HOST machine.
-            destination = "local/servers.json"
-            change_mode = "restart"
-          }
-
-          # This command runs after the template is rendered, fixing the file ownership.
-          config {
-            command = "bash"
-            args = [
-              "-c",
-              "mkdir -p /mnt/glusterfs/postgres/pgadmin && chown -R 5050:5050 /mnt/glusterfs/postgres/pgadmin"
-            ]
-          }
-
-          resources {
-            cpu    = 100
-            memory = 64
-          }
-        }
 
     task "pgadmin" {
       driver = "docker"
+
+      template {
+        data = <<EOH
+{
+  "Servers": {
+    "1": {
+      "Name": "Postgres (Nomad)",
+      "Group": "Servers",
+      "Host": "postgres.service.consul",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "{{ key \"postgres/adminuser\" }}",
+      "Password": "{{ key \"postgres/adminpassword\" }}",
+      "SSLMode": "prefer"
+    }
+  }
+}
+EOH
+        destination = "local/servers.json"
+        perms       = "0644"
+      }
 
       config {
         image = "dpage/pgadmin4"
@@ -202,10 +173,10 @@ job "postgres-stack" {
             readonly = false
           },
           {
-            type        = "bind"
-            source      = "local/servers.json"
-            target      = "/var/lib/pgadmin/servers.json"
-            readonly    = true
+            type     = "bind"
+            source   = "local/servers.json"
+            target   = "/var/lib/pgadmin/servers.json"
+            readonly = true
           },
         ]
       }
