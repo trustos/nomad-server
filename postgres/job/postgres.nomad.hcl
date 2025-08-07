@@ -135,6 +135,8 @@ job "postgres-stack" {
       }
     }
 
+    # This prestart task creates the config file and sets the correct ownership
+        # before the main pgadmin task starts.
     task "setup-pgadmin-config" {
       lifecycle {
         hook    = "prestart"
@@ -147,22 +149,22 @@ job "postgres-stack" {
       # It writes the file directly to the shared volume.
       template {
         data = <<EOH
-{
+  {
   "Servers": {
     "1": {
       "Name": "Postgres (Nomad)",
       "Group": "Servers",
-      # Use Consul service discovery for a more robust connection
-      "Host": "{{ (service "postgres").first.Address }}",
-      "Port": {{ (service "postgres").first.Port }},
+      # CORRECTED: Use `index` to get the first service from the list.
+      "Host": "{{ (index (service "postgres") 0).Address }}",
+      "Port": {{ (index (service "postgres") 0).Port }},
       "MaintenanceDB": "postgres",
       "Username": "{{ key "postgres/adminuser" }}",
       "Password": "{{ key "postgres/adminpassword" }}",
       "SSLMode": "prefer"
     }
   }
-}
-EOH
+  }
+  EOH
         # Note: This destination is a path on the HOST machine.
         destination = "/mnt/glusterfs/postgres/pgadmin/servers.json"
         perms       = "0644"
