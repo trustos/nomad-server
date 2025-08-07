@@ -154,13 +154,40 @@ job "postgres-stack" {
 
       template {
          data = <<EOH
-     PGADMIN_DEFAULT_EMAIL={{ key "postgres/pgadminuser" }}
-     PGADMIN_DEFAULT_PASSWORD={{ key "postgres/pgadminpassword" }}
-     EOH
+PGADMIN_DEFAULT_EMAIL={{ key "postgres/pgadminuser" }}
+PGADMIN_DEFAULT_PASSWORD={{ key "postgres/pgadminpassword" }}
+EOH
 
          destination = "secrets/env"
          env         = true
-       }
+      }
+
+      # Add servers.json template for auto server registration
+      template {
+        data = <<EOH
+{
+  "Servers": {
+    "1": {
+      "Name": "Postgres",
+      "Group": "Servers",
+      "Host": "pg.rs-estates",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "{{ key \"postgres/adminuser\" }}",
+      "Password": "{{ key \"postgres/adminpassword\" }}",
+      "SSLMode": "prefer"
+    }
+  }
+}
+EOH
+
+        destination = "/var/lib/pgadmin/servers.json"
+      }
+
+      env {
+        PGADMIN_CONFIG_SERVER_MODE = "True"
+        PGADMIN_SERVERS_JSON_FILE = "/var/lib/pgadmin/servers.json"
+      }
 
       resources {
         cpu    = 300
