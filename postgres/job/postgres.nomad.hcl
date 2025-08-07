@@ -84,29 +84,6 @@ job "postgres-stack" {
         sidecar = false
       }
 
-      template {
-         data = <<EOH
-     NOMAD_TOKEN={{ key "nomad/bootstrap-token" }}
-     EOH
-
-         destination = "secrets/env"
-         env         = true
-      }
-
-      config {
-        command = "bash"
-        args = [
-          "-c",
-          "NOMAD_TOKEN=$NOMAD_TOKEN nomad apply namespace --description='Postgres namespace' postgres"
-        ]
-      }
-
-      resources {
-        cpu    = 100
-        memory = 64
-      }
-    }
-
     network {
       port "db" {
         static = 5432
