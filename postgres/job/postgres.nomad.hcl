@@ -156,7 +156,7 @@ job "postgres-stack" {
           "Group": "Servers",
           # CORRECTED: Use the stable Consul DNS name to avoid the startup race condition.
           # This assumes your datacenter is "dc1" as defined in the job file.
-          "Host": "postgres.service.dc1.consul",
+          "Host": "postgres.service.consul",
           # The port is defined as static in the postgres task, so we can use it directly.
           "Port": 5432,
           "MaintenanceDB": "postgres",
