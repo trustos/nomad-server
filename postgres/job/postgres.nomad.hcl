@@ -150,15 +150,14 @@ job "postgres-stack" {
       "Host": "postgres.service.consul",
       "Port": 5432,
       "MaintenanceDB": "postgres",
-      "Username": {{ key "postgres/adminuser" }},
-      "Password": {{ key "postgres/adminpassword" }},
+      "Username": '{{ key "postgres/adminuser" }}',
+      "Password": '{{ key "postgres/adminpassword" }}',
       "SSLMode": "prefer"
     }
   }
 }
 EOH
         destination = "local/servers.json"
-        perms       = "0644"
       }
 
       config {
