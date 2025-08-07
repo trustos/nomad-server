@@ -17,7 +17,7 @@ job "postgres-stack" {
         command = "bash"
         args = [
           "-c",
-          "mkdir -p /mnt/glusterfs/postgres/data16 && mkdir -p /mnt/glusterfs/postgres/pgadmin && chown -R 999:999 /mnt/glusterfs/postgres/data16 && chown -R 5050:5050 /mnt/glusterfs/postgres/pgadmin"
+          "mkdir -p /mnt/glusterfs/postgres/data16 && chown -R 999:999 /mnt/glusterfs/postgres/data16"
         ]
       }
 
@@ -174,9 +174,11 @@ job "postgres-stack" {
 
           # This command runs after the template is rendered, fixing the file ownership.
           config {
-            command = "chown"
-            # UID 5050 and GID 5050 belong to the 'pgadmin' user inside the container.
-            args = ["5050:5050", "/mnt/glusterfs/postgres/pgadmin/servers.json"]
+            command = "bash"
+            args = [
+              "-c",
+              "mkdir -p /mnt/glusterfs/postgres/pgadmin && chown -R 5050:5050 /mnt/glusterfs/postgres/pgadmin"
+            ]
           }
 
           resources {
