@@ -168,8 +168,8 @@ job "postgres-stack" {
     }
     EOH
             # Note: This destination is a path on the HOST machine.
-            destination = "/mnt/glusterfs/postgres/pgadmin/servers.json"
-            perms       = "0644"
+            destination = "local/servers.json"
+            change_mode = "restart"
           }
 
           # This command runs after the template is rendered, fixing the file ownership.
@@ -200,7 +200,13 @@ job "postgres-stack" {
             source   = "/mnt/glusterfs/postgres/pgadmin"
             target   = "/var/lib/pgadmin"
             readonly = false
-          }
+          },
+          {
+            type        = "bind"
+            source      = "local/servers.json"
+            target      = "/var/lib/pgadmin/servers.json"
+            readonly    = true
+          },
         ]
       }
 
