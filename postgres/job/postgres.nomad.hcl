@@ -160,8 +160,8 @@ job "postgres-stack" {
           # The port is defined as static in the postgres task, so we can use it directly.
           "Port": 5432,
           "MaintenanceDB": "postgres",
-          "Username": "{{ key "postgres/adminuser" }}",
-          "Password": "{{ key "postgres/adminpassword" }}",
+          "Username": {{ key "postgres/adminuser" }},
+          "Password": {{ key "postgres/adminpassword" }},
           "SSLMode": "prefer"
         }
       }
