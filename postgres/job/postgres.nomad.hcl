@@ -57,7 +57,7 @@ job "postgres-stack" {
 
           # Check and set PGADMIN_DEFAULT_EMAIL
           if ! consul kv get postgres/pgadminuser > /dev/null 2>&1; then
-            user="adminuser"
+            user="pgadminuser@rs-estates"
             consul kv put postgres/pgadminuser "$user"
           fi
 
