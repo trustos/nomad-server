@@ -154,6 +154,15 @@ job "postgres-stack" {
       driver = "docker"
 
       template {
+         data = <<EOH
+     PGADMIN_DEFAULT_EMAIL={{ key "postgres/pgadminuser" }}
+     PGADMIN_DEFAULT_PASSWORD={{ key "postgres/pgadminpassword" }}
+     EOH
+         destination = "secrets/env"
+         env         = true
+       }
+
+      template {
         data = <<EOH
 {
   "Servers": {
