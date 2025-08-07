@@ -184,6 +184,7 @@ job "postgres-stack" {
 }
 EOH
         destination = "local/servers.json"
+        perms       = "0644"
       }
 
       config {
@@ -201,7 +202,7 @@ EOH
             type     = "bind"
             source   = "local/servers.json"
             target   = "/var/lib/pgadmin/servers.json"
-            readonly = true
+            readonly = false
           },
         ]
       }
@@ -209,6 +210,7 @@ EOH
       env {
         PGADMIN_CONFIG_SERVER_MODE = "True"
         PGADMIN_SERVERS_JSON_FILE = "/var/lib/pgadmin/servers.json"
+        PGADMIN_REPLACE_SERVERS_ON_STARTUP = "True"
       }
 
       resources {
