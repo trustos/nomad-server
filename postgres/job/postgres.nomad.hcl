@@ -140,9 +140,13 @@ job "postgres-stack" {
       lifecycle {
         hook = "prestart"
       }
+
       config {
-        command = "mkdir"
-        args    = ["-p", "/mnt/glusterfs/postgres/pgadmin"]
+        command = "bash"
+        args = [
+          "-c",
+          "mkdir -p /mnt/glusterfs/postgres/pgadmin && chown -R 5050:5050 /mnt/glusterfs/postgres/pgadmin"
+        ]
       }
       resources {
         cpu    = 50
