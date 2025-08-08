@@ -99,12 +99,12 @@ job "nocobase" {
 
       template {
           data = <<EOH
-      DB_TYPE     = "postgres"
-      DB_HOST     = "postgres.service.consul"
-      DB_PORT     = "5432"
-      DB_DIALECT  = "postgres"
-      TZ          = "Europe/Sofia"
-      NODE_ENV    = "production"
+      DB_TYPE     = postgres
+      DB_HOST     = postgres.service.consul
+      DB_PORT     = 5432
+      DB_DIALECT  = postgres
+      TZ          = Europe/Sofia
+      NODE_ENV    = production
       DB_USER={{ key "nocobase/db_user" }}
       DB_PASSWORD={{ key "nocobase/db_password" }}
       DB_DATABASE={{ key "nocobase/db_name" }}
