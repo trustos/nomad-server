@@ -21,8 +21,13 @@ job "nocobase" {
       config {
         image = "nocobase/nocobase:latest"
         ports = ["web"]
-        volumes = [
-          "/mnt/glusterfs/nocobase:/app/data"
+        mounts = [
+          {
+            type     = "bind"
+            source   = "/mnt/glusterfs/nocobase/storage"
+            target   = "/app/nocobase/storage"
+            readonly = false
+          },
         ]
       }
 
