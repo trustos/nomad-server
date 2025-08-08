@@ -5,49 +5,6 @@ job "nocobase" {
   group "nocobase" {
     count = 1
 
-    # Prestart task to initialize secrets in Consul KV
-    task "init-secrets" {
-      lifecycle {
-        hook    = "prestart"
-        sidecar = false
-      }
-
-      driver = "raw_exec"
-
-      config {
-        command = "bash"
-        args = [
-          "-c",
-          <<-EOT
-          #!/bin/bash
-          set -e
-
-          # Set NocoBase DB user
-          if ! consul kv get nocobase/db_user > /dev/null 2>&1; then
-            user="nocobaseuser"
-            consul kv put nocobase/db_user "$user"
-          fi
-
-          # Set NocoBase DB password
-          if ! consul kv get nocobase/db_password > /dev/null 2>&1; then
-            pw=$(openssl rand -base64 24)
-            consul kv put nocobase/db_password "$pw"
-          fi
-
-          # Set NocoBase DB name
-          if ! consul kv get nocobase/db_name > /dev/null 2>&1; then
-            consul kv put nocobase/db_name "nocobase"
-          fi
-          EOT
-        ]
-      }
-
-      resources {
-        cpu    = 100
-        memory = 64
-      }
-    }
-
     # Main NocoBase task
     task "nocobase" {
       driver = "docker"
