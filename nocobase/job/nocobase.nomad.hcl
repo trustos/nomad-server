@@ -16,8 +16,10 @@ job "nocobase" {
 
     task "init-nocobase-dir" {
       driver = "raw_exec"
+
       lifecycle {
         hook = "prestart"
+        sidecar = false
       }
       config {
         command = "mkdir"
@@ -36,11 +38,6 @@ job "nocobase" {
       }
 
       driver = "raw_exec"
-
-      # INIT_ROOT_EMAIL=admin@nocobase.com
-      # INIT_ROOT_PASSWORD=admin123
-      # INIT_ROOT_NICKNAME=Super Admin
-      # INIT_ROOT_USERNAME=nocobase
 
       config {
         command = "bash"
@@ -102,6 +99,12 @@ job "nocobase" {
 
       template {
           data = <<EOH
+      DB_TYPE     = "postgres"
+      DB_HOST     = "postgres.service.consul"
+      DB_PORT     = "5432"
+      DB_DIALECT  = "postgres"
+      TZ          = "Europe/Sofia"
+      NODE_ENV    = "production"
       DB_USER={{ key "nocobase/db_user" }}
       DB_PASSWORD={{ key "nocobase/db_password" }}
       DB_DATABASE={{ key "nocobase/db_name" }}
@@ -114,16 +117,16 @@ job "nocobase" {
           env         = true
         }
 
-      env {
-        DB_TYPE     = "postgres"
-        DB_HOST     = "postgres.service.consul"
-        DB_PORT     = "5432"
-        DB_DIALECT  = "postgres"
-        # Time zone
-        TZ          = "Europe/Sofia"
-        NODE_ENV    = "production"
-        # PORT will be set dynamically by Nomad
-      }
+      # env {
+      #   DB_TYPE     = "postgres"
+      #   DB_HOST     = "postgres.service.consul"
+      #   DB_PORT     = "5432"
+      #   DB_DIALECT  = "postgres"
+      #   # Time zone
+      #   TZ          = "Europe/Sofia"
+      #   NODE_ENV    = "production"
+      #   # PORT will be set dynamically by Nomad
+      # }
 
       resources {
         cpu    = 500
