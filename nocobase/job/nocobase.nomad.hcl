@@ -9,6 +9,15 @@ job "nocobase" {
     task "nocobase" {
       driver = "docker"
 
+      network {
+        port "web" {
+          # Uncomment the next line for static port, or remove for dynamic assignment
+          # static = 13000
+          to     = 13000
+          # dynamic = true
+        }
+      }
+
       config {
         image = "nocobase/nocobase:latest"
         ports = ["web"]
@@ -41,15 +50,6 @@ job "nocobase" {
       resources {
         cpu    = 500
         memory = 1024
-
-        network {
-          port "web" {
-            # Uncomment the next line for static port, or remove for dynamic assignment
-            # static = 13000
-            to     = 13000
-            # dynamic = true
-          }
-        }
       }
 
       service {
