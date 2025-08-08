@@ -56,7 +56,7 @@ job "nocobase" {
         name = "nocobase"
         port = "web"
         tags = [
-          "nocobase"
+          "nocobase",
           "traefik.enable=true",
           "traefik.http.routers.nocobase.rule=Host(`crm.rs-estates`)",
           "traefik.http.routers.nocobase.entrypoints=web",
