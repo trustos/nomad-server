@@ -198,18 +198,26 @@ EOH
             target   = "/var/lib/pgadmin"
             readonly = false
           },
+          # {
+          #   type     = "bind"
+          #   source   = "local/servers.json"
+          #   target   = "/var/lib/pgadmin/servers.json"
+          #   readonly = false
+          # },
+
+          # CORRECTED: Mount servers.json to a non-conflicting path
           {
             type     = "bind"
             source   = "local/servers.json"
-            target   = "/var/lib/pgadmin/servers.json"
-            readonly = false
+            target   = "/pgadmin4/servers.json" # Use pgAdmin's internal path
+            readonly = true
           },
         ]
       }
 
       env {
         PGADMIN_CONFIG_SERVER_MODE = "True"
-        PGADMIN_SERVERS_JSON_FILE = "/var/lib/pgadmin/servers.json"
+        # PGADMIN_SERVERS_JSON_FILE = "/var/lib/pgadmin/servers.json"
         PGADMIN_REPLACE_SERVERS_ON_STARTUP = "True"
       }
 
