@@ -17,13 +17,23 @@ job "nocobase" {
         ]
       }
 
+      template {
+          data = <<EOH
+      DB_USER={{ key "nocobase/db_user" }}
+      DB_PASSWORD={{ key "nocobase/db_password" }}
+      DB_DATABASE={{ key "nocobase/db_name" }}
+      EOH
+          destination = "secrets/env"
+          env         = true
+        }
+
       env {
         DB_TYPE     = "postgres"
         DB_HOST     = "postgres.service.consul"
         DB_PORT     = "5432"
-        DB_USER     = "${CONSUL_KEY(nocobase/db_user)}"
-        DB_PASSWORD = "${CONSUL_KEY(nocobase/db_password)}"
-        DB_DATABASE = "${CONSUL_KEY(nocobase/db_name)}"
+        DB_DIALECT  = "postgres"
+        # Time zone
+        TZ          = "Europe/Sofia"
         NODE_ENV    = "production"
         # PORT will be set dynamically by Nomad
       }
