@@ -5,18 +5,18 @@ job "nocobase" {
   group "nocobase" {
     count = 1
 
+    network {
+      port "web" {
+        # Uncomment the next line for static port, or remove for dynamic assignment
+        # static = 13000
+        to     = 13000
+        # dynamic = true
+      }
+    }
+
     # Main NocoBase task
     task "nocobase" {
       driver = "docker"
-
-      network {
-        port "web" {
-          # Uncomment the next line for static port, or remove for dynamic assignment
-          # static = 13000
-          to     = 13000
-          # dynamic = true
-        }
-      }
 
       config {
         image = "nocobase/nocobase:latest"
