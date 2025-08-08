@@ -29,6 +29,60 @@ job "nocobase" {
       }
     }
 
+    task "init-secrets" {
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "raw_exec"
+
+      # INIT_ROOT_EMAIL=admin@nocobase.com
+      # INIT_ROOT_PASSWORD=admin123
+      # INIT_ROOT_NICKNAME=Super Admin
+      # INIT_ROOT_USERNAME=nocobase
+
+      config {
+        command = "bash"
+        args = [
+          "-c",
+          <<-EOT
+          #!/bin/bash
+          set -e
+
+          # Check and set INIT_ROOT_EMAIL
+          if ! consul kv get nocobase/init_root_email > /dev/null 2>&1; then
+            useremail="admin@nocobase.rs-estates"
+            consul kv put nocobase/init_root_email "$useremail"
+          fi
+
+          # Check and set INIT_ROOT_PASSWORD
+          if ! consul kv get nocobase/init_root_password > /dev/null 2>&1; then
+            pw=$(openssl rand -base64 24)
+            consul kv put nocobase/init_root_password "$pw"
+          fi
+
+          # Check and set INIT_ROOT_NICKNAME
+          if ! consul kv get nocobase/init_root_nickname > /dev/null 2>&1; then
+            nickname="Admin Nocobase RS Estates"
+            consul kv put nocobase/init_root_nickname "$nickname"
+          fi
+
+          # Check and set INIT_ROOT_USERNAME
+          if ! consul kv get nocobase/init_root_username > /dev/null 2>&1; then
+            username="nocoadmin"
+            consul kv put nocobase/init_root_username "$username"
+          fi
+          EOT
+        ]
+      }
+
+      resources {
+        cpu    = 100
+        memory = 64
+      }
+    }
+
     # Main NocoBase task
     task "nocobase" {
       driver = "docker"
@@ -51,6 +105,10 @@ job "nocobase" {
       DB_USER={{ key "nocobase/db_user" }}
       DB_PASSWORD={{ key "nocobase/db_password" }}
       DB_DATABASE={{ key "nocobase/db_name" }}
+      INIT_ROOT_EMAIL={{ key "nocobase/init_root_email" }}
+      INIT_ROOT_PASSWORD={{ key "nocobase/init_root_password" }}
+      INIT_ROOT_NICKNAME={{ key "nocobase/init_root_nickname" }}
+      INIT_ROOT_USERNAME={{ key "nocobase/init_root_username" }}
       EOH
           destination = "secrets/env"
           env         = true
