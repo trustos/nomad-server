@@ -14,6 +14,21 @@ job "nocobase" {
       }
     }
 
+    task "init-nocobase-dir" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "mkdir"
+        args    = ["-p", "/mnt/glusterfs/nocobase/storage"]
+      }
+      resources {
+        cpu    = 50
+        memory = 32
+      }
+    }
+
     # Main NocoBase task
     task "nocobase" {
       driver = "docker"
