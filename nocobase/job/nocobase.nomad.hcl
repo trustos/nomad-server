@@ -80,6 +80,11 @@ job "nocobase" {
           "traefik.enable=true",
           "traefik.http.routers.nocobase.rule=Host(`crm.rs-estates`)",
           "traefik.http.routers.nocobase.entrypoints=web",
+
+          "traefik.htto.routers.nocobase-inet.rule=Host(`crm.rs-estates.com`)",
+          "traefik.http.routers.nocobase-init.entrypoints=web,websecure",
+          "traefik.http.routers.nocobase-secure.tls=true",
+          "traefik.http.routers.nocobase-secure.tls.certresolver=cert-prod",
         ]
         check {
           type     = "http"
