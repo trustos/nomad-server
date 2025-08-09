@@ -82,7 +82,7 @@ job "nocobase" {
           "traefik.http.routers.nocobase.entrypoints=web",
 
           "traefik.http.routers.nocobase-inet.rule=Host(`crm.rs-estates.com`)",
-          "traefik.http.routers.nocobase-inet.entrypoints=web,websecure"
+          "traefik.http.routers.nocobase-inet.entrypoints=web,websecure",
           "traefik.http.routers.nocobase-inet.tls=true",
           "traefik.http.routers.nocobase-inet.tls.certresolver=cert-stag",
         ]
