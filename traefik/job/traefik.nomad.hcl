@@ -89,14 +89,6 @@ EOT
       driver = "docker"
 
       template {
-         data = <<EOH
-     TRAEFIK_TOKEN={{ key "nomad/traefik-token" }}
-     EOH
-         destination = "secrets/env"
-         env         = true
-       }
-
-      template {
         data = <<EOF
 entryPoints:
   web:
@@ -126,7 +118,7 @@ providers:
   nomad:
     endpoint:
       address: "http://nomad.service.consul:4646"
-      token: "${TRAEFIK_TOKEN}"
+      token: "{{ key "nomad/traefik-token" }}"
     watch: true
     namespaces:
       - "nomad-ops"
