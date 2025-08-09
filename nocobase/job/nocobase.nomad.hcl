@@ -31,6 +31,49 @@ job "nocobase" {
       }
     }
 
+    task "init-nocobase-consul-kv" {
+      driver = "raw_exec"
+
+      lifecycle {
+        hook = "prestart"
+        sidecar = false
+      }
+
+      config {
+        command = "bash"
+        args = [
+          "-c",
+          <<-EOT
+          #!/bin/bash
+          set -e
+
+          # Check and set NocoBase database user
+          if ! consul kv get nocobase/db_user > /dev/null 2>&1; then
+            user="nocobase"
+            consul kv put nocobase/db_user "$user"
+          fi
+
+          # Check and set NocoBase database password
+          if ! consul kv get nocobase/db_password > /dev/null 2>&1; then
+            pw=$(openssl rand -base64 24)
+            consul kv put nocobase/db_password "$pw"
+          fi
+
+          # Check and set NocoBase database name
+          if ! consul kv get nocobase/db_name > /dev/null 2>&1; then
+            dbname="nocobase"
+            consul kv put nocobase/db_name "$dbname"
+          fi
+          EOT
+        ]
+      }
+
+      resources {
+        cpu    = 100
+        memory = 64
+      }
+    }
+
     # Main NocoBase task
     task "nocobase" {
       driver = "docker"
