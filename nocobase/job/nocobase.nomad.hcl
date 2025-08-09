@@ -78,8 +78,8 @@ job "nocobase" {
         tags = [
           "nocobase",
           "traefik.enable=true",
-          "traefik.http.routers.nocobase.rule=Host(`crm.rs-estates`)",
-          "traefik.http.routers.nocobase.entrypoints=web",
+          # "traefik.http.routers.nocobase.rule=Host(`crm.rs-estates`)",
+          # "traefik.http.routers.nocobase.entrypoints=web",
 
           "traefik.http.routers.nocobase-inet.rule=Host(`crm.rs-estates.com`)",
           "traefik.http.routers.nocobase-inet.entrypoints=web,websecure",
