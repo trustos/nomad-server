@@ -266,13 +266,23 @@ while true; do
   fi
 
   if [ $CHANGED -eq 1 ]; then
-    NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik 2>&1)
+    NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json --namespace=traefik traefik 2>&1)
     echo "NOMAD job allocs output:"
     echo "$NOMAD_ALLOCS_JSON"
 
-    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID')
-    echo "Follower allocation IDs to restart:"
-    echo "$ALLOC_IDS"
+    # For system jobs, use the lexicographically first node as leader
+    LEADER_NODE=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running") | .NodeName' | sort | head -n1)
+    echo "Leader node: $LEADER_NODE"
+
+    # Get follower allocation IDs (all nodes except the leader)
+    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r --arg leader "$LEADER_NODE" '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and .NodeName != $leader) | .ID')
+
+    if [ -n "$ALLOC_IDS" ]; then
+      echo "Follower allocation IDs to restart:"
+      echo "$ALLOC_IDS"
+    else
+      echo "No follower allocations found to restart (single-node setup)"
+    fi
 
     for alloc_id in $ALLOC_IDS; do
       echo "Restarting follower allocation: $alloc_id"
