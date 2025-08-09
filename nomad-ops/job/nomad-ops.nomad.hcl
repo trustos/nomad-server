@@ -126,6 +126,7 @@ job "nomad-ops" {
          data = <<EOH
      DEFAULT_USER_EMAIL={{ key "nomad-ops/adminuseremail" }}
      DEFAULT_USER_PASSWORD={{ key "nomad-ops/adminpassword" }}
+     NOMAD_TOKEN={{ key "nomad/bootstrap-token" }}
      EOH
 
          destination = "secrets/env"
@@ -138,7 +139,6 @@ job "nomad-ops" {
 
         # Adjust accordingly
         NOMAD_ADDR = "http://${NOMAD_IP_http}:4646"
-        NOMAD_TOKEN = "${NOMAD_TOKEN}"
 
         TRACE = "FALSE"
       }

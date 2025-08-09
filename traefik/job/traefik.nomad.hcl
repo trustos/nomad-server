@@ -87,11 +87,14 @@ EOT
 
     task "traefik" {
       driver = "docker"
-      env {
-        TRAEFIK_TOKEN = "${TRAEFIK_TOKEN}"
-      }
 
-
+      template {
+         data = <<EOH
+     TRAEFIK_TOKEN={{ key "nomad/traefik-token" }}
+     EOH
+         destination = "secrets/env"
+         env         = true
+       }
 
       template {
         data = <<EOF
@@ -299,9 +302,15 @@ done
 EOT
         ]
       }
-      env {
-        MGMT_TOKEN = "${MGMT_TOKEN}"
-      }
+
+      template {
+         data = <<EOH
+     MGMT_TOKEN={{ key "nomad/bootstrap-token" }}
+     EOH
+         destination = "secrets/env"
+         env         = true
+       }
+
       resources {
         cpu    = 50
         memory = 64
