@@ -1,8 +1,8 @@
 job "zerotier" {
   datacenters = ["dc1"]
+  type = "system"
 
   group "zt" {
-    count = 1
 
     task "zerotier" {
       driver = "raw_exec"
