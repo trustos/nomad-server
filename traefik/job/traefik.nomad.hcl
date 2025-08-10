@@ -74,11 +74,11 @@ fi
 echo "DEBUG: Using leader node: $LEADER_NODE"
 echo "DEBUG: Attempting to write acme-redirect.yaml..."
 
-cat <<'EOF' > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
+cat <<EOF > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
 http:
   routers:
     acme-challenge-redirect:
-      rule: PathPrefix(`/.well-known/acme-challenge/`)
+      rule: PathPrefix(\`/.well-known/acme-challenge/\`)
       entryPoints:
         - web
       priority: 10000
@@ -109,22 +109,13 @@ EOT
       config {
         command = "bash"
         args = ["-c", <<EOT
-# Leader election logic with health checks
+# Leader election logic
 CONSUL_ADDR="consul.service.consul:8500"
 LEADER_KEY="traefik/leader"
-LEADER_HEALTH_KEY="traefik/leader/health"
 NODE_NAME="${NOMAD_NODE_NAME}"
 ALLOC_INDEX="${NOMAD_ALLOC_INDEX}"
 
 echo "DEBUG: Node: $NODE_NAME, Alloc Index: $ALLOC_INDEX"
-
-# Function to check if a node is healthy
-check_node_health() {
-  local node_name=$1
-  # Check if the node has a running traefik service in Consul
-  local health_status=$(curl -s "http://$CONSUL_ADDR/v1/health/node/$node_name" | jq -r '.[].Checks[] | select(.ServiceName=="traefik-0" or .ServiceName=="traefik-1" or .ServiceName=="traefik-2") | .Status' | head -1)
-  [ "$health_status" = "passing" ]
-}
 
 # Get current leader
 CURRENT_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
@@ -138,31 +129,15 @@ if [ -z "$CURRENT_LEADER" ]; then
 
   if [ "$SUCCESS" = "true" ]; then
     echo "Successfully became leader"
-    # Set health timestamp
-    curl -s -X PUT -d "$(date +%s)" "http://$CONSUL_ADDR/v1/kv/$LEADER_HEALTH_KEY" >/dev/null
   else
     echo "Failed to become leader, another node was faster"
   fi
 else
   echo "Current leader is: $CURRENT_LEADER"
 
-  # Check if current leader is healthy
-  if ! check_node_health "$CURRENT_LEADER"; then
-    echo "Current leader $CURRENT_LEADER appears unhealthy, attempting to take over..."
-
-    # Try to become the new leader
-    SUCCESS=$(curl -s -X PUT -d "$NODE_NAME" "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY")
-
-    if [ "$SUCCESS" = "true" ]; then
-      echo "Successfully took over leadership from unhealthy leader"
-      curl -s -X PUT -d "$(date +%s)" "http://$CONSUL_ADDR/v1/kv/$LEADER_HEALTH_KEY" >/dev/null
-    else
-      echo "Failed to take over leadership"
-    fi
-  elif [ "$CURRENT_LEADER" = "$NODE_NAME" ]; then
+  # If this node was the previous leader and is restarting, reclaim leadership
+  if [ "$CURRENT_LEADER" = "$NODE_NAME" ]; then
     echo "This node was the previous leader, maintaining leadership"
-    # Update health timestamp
-    curl -s -X PUT -d "$(date +%s)" "http://$CONSUL_ADDR/v1/kv/$LEADER_HEALTH_KEY" >/dev/null
   fi
 fi
 
@@ -172,8 +147,10 @@ echo "Final leader: $FINAL_LEADER"
 
 if [ "$FINAL_LEADER" = "$NODE_NAME" ]; then
   echo "This node is the ACME leader"
+  echo "true" > /tmp/is_leader
 else
   echo "This node is a follower"
+  echo "false" > /tmp/is_leader
 fi
 EOT
         ]
@@ -189,14 +166,10 @@ EOT
 
       template {
         data = <<EOF
-# Current leader: {{ key "traefik/leader" }}
-# This node: {{ env "NOMAD_NODE_NAME" }}
-# Is leader: {{ if eq (key "traefik/leader") (env "NOMAD_NODE_NAME") }}true{{ else }}false{{ end }}
-
 entryPoints:
   web:
     address: ":80"
-    {{ if ne (key "traefik/leader") (env "NOMAD_NODE_NAME") }}
+    {{ if ne (env "NOMAD_ALLOC_INDEX") "0" }}
     allowACMEByPass: true
     {{ end }}
 
@@ -232,7 +205,7 @@ providers:
     watch: true
 
 certificatesResolvers:
-{{ if eq (key "traefik/leader") (env "NOMAD_NODE_NAME") }}
+{{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}
   cert-prod:
     acme:
       email: trustos@gmail.com
@@ -263,11 +236,6 @@ certificatesResolvers:
 EOF
         destination = "local/traefik.yaml"
         change_mode = "restart"
-        wait {
-          min = "2s"
-          max = "10s"
-        }
-        perms = "644"
       }
       config {
         image = "traefik:v3.4.3"
@@ -304,8 +272,7 @@ EOF
         port = "http"
         tags = [
           "acme",
-          "role=${NOMAD_ALLOC_INDEX}",
-          "leader={{ if eq (key "traefik/leader") (env "NOMAD_NODE_NAME") }}true{{ else }}false{{ end }}"
+          "role=${NOMAD_ALLOC_INDEX}"
         ]
         check {
           type     = "http"
@@ -313,51 +280,11 @@ EOF
           interval = "10s"
           timeout  = "2s"
         }
-        check {
-          name     = "leader-health"
-          type     = "script"
-          command  = "/bin/bash"
-          args     = ["-c", "if [ \"{{ env \"NOMAD_NODE_NAME\" }}\" = \"$(curl -s http://consul.service.consul:8500/v1/kv/traefik/leader?raw 2>/dev/null)\" ]; then curl -s -X PUT -d \"$(date +%s)\" http://consul.service.consul:8500/v1/kv/traefik/leader/health >/dev/null; fi; exit 0"]
-          interval = "30s"
-          timeout  = "5s"
-        }
         enable_tag_override = true
       }
       resources {
         cpu    = 384
         memory = 512
-      }
-    }
-
-    task "leader-health-monitor" {
-      driver = "raw_exec"
-      config {
-        command = "bash"
-        args = ["-c", <<EOT
-# Continuous leader health monitoring
-CONSUL_ADDR="consul.service.consul:8500"
-LEADER_KEY="traefik/leader"
-LEADER_HEALTH_KEY="traefik/leader/health"
-NODE_NAME="${NOMAD_NODE_NAME}"
-
-while true; do
-  # Check if this node is the current leader
-  CURRENT_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
-
-  if [ "$CURRENT_LEADER" = "$NODE_NAME" ]; then
-    # Update health timestamp as leader
-    curl -s -X PUT -d "$(date +%s)" "http://$CONSUL_ADDR/v1/kv/$LEADER_HEALTH_KEY" >/dev/null
-    echo "$(date) - Updated leader health timestamp"
-  fi
-
-  sleep 30
-done
-EOT
-        ]
-      }
-      resources {
-        cpu    = 10
-        memory = 16
       }
     }
 
@@ -376,8 +303,6 @@ ACME_FILE1="$ACME_DIR/acme-prod.json"
 ACME_FILE2="$ACME_DIR/acme-stag.json"
 DEBOUNCE_SECONDS=60
 POLL_INTERVAL=10
-CONSUL_ADDR="consul.service.consul:8500"
-LEADER_KEY="traefik/leader"
 
 if [ -f "$ACME_FILE1" ]; then
   LAST_HASH1=$(md5sum "$ACME_FILE1" | awk '{print $1}')
@@ -391,20 +316,8 @@ else
   LAST_HASH2=""
 fi
 
-# Track current leader
-LAST_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
-
 while true; do
   CHANGED=0
-  LEADER_CHANGED=0
-
-  # Check for leadership changes
-  CURRENT_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
-  if [ "$LAST_LEADER" != "$CURRENT_LEADER" ]; then
-    echo "$(date) - Leadership change detected: $LAST_LEADER -> $CURRENT_LEADER"
-    LAST_LEADER="$CURRENT_LEADER"
-    LEADER_CHANGED=1
-  fi
 
   if [ -f "$ACME_FILE1" ]; then
     NEW_HASH1=$(md5sum "$ACME_FILE1" | awk '{print $1}')
@@ -428,92 +341,59 @@ while true; do
     echo "$(date) - WARNING: $ACME_FILE2 does not exist!"
   fi
 
-  if [ $CHANGED -eq 1 ] || [ $LEADER_CHANGED -eq 1 ]; then
-    if [ $CHANGED -eq 1 ]; then
-      ACTION="Certificate change"
-    else
-      ACTION="Leadership change"
-    fi
-    echo "$(date) - $ACTION detected, processing restart..."
-    # Only wait for file stabilization if it's a certificate change
-    if [ $CHANGED -eq 1 ]; then
-      echo "$(date) - Certificate change detected, waiting for files to stabilize..."
+  if [ $CHANGED -eq 1 ]; then
+    echo "$(date) - Certificate change detected, waiting for files to stabilize..."
 
-      # Wait for files to stabilize (not modified in the last 30 seconds)
-      STABLE=0
-      while [ $STABLE -eq 0 ]; do
-        STABLE=1
-        if [ -f "$ACME_FILE1" ] && [ $(find "$ACME_FILE1" -mmin -0.5 2>/dev/null | wc -l) -gt 0 ]; then
-          echo "$(date) - $ACME_FILE1 still being modified, waiting..."
-          STABLE=0
-        fi
-        if [ -f "$ACME_FILE2" ] && [ $(find "$ACME_FILE2" -mmin -0.5 2>/dev/null | wc -l) -gt 0 ]; then
-          echo "$(date) - $ACME_FILE2 still being modified, waiting..."
-          STABLE=0
-        fi
-        if [ $STABLE -eq 0 ]; then
-          sleep 10
-        fi
-      done
+    # Wait for files to stabilize (not modified in the last 30 seconds)
+    STABLE=0
+    while [ $STABLE -eq 0 ]; do
+      STABLE=1
+      if [ -f "$ACME_FILE1" ] && [ $(find "$ACME_FILE1" -mmin -0.5 2>/dev/null | wc -l) -gt 0 ]; then
+        echo "$(date) - $ACME_FILE1 still being modified, waiting..."
+        STABLE=0
+      fi
+      if [ -f "$ACME_FILE2" ] && [ $(find "$ACME_FILE2" -mmin -0.5 2>/dev/null | wc -l) -gt 0 ]; then
+        echo "$(date) - $ACME_FILE2 still being modified, waiting..."
+        STABLE=0
+      fi
+      if [ $STABLE -eq 0 ]; then
+        sleep 10
+      fi
+    done
 
-      echo "$(date) - Files stabilized, proceeding with restart..."
-    fi
+    echo "$(date) - Files stabilized, proceeding with follower restarts..."
     NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json --namespace=traefik traefik 2>&1)
     echo "NOMAD job allocs output:"
     echo "$NOMAD_ALLOCS_JSON"
 
+    # Use Consul KV to determine the leader
+    CONSUL_ADDR="consul.service.consul:8500"
+    LEADER_KEY="traefik/leader"
+
     # Get current leader from Consul KV
-    # Use Consul KV to determine the leader with health validation
     CURRENT_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
 
     # Get all running allocations
     RUNNING_ALLOCS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running") | "\(.NodeName):\(.ID)"')
     RUNNING_NODES=$(echo "$RUNNING_ALLOCS" | cut -d: -f1 | sort)
 
-    # Function to check leader health
-    check_leader_health() {
-      local leader=$1
-      local health_timestamp=$(curl -s "http://$CONSUL_ADDR/v1/kv/traefik/leader/health?raw" 2>/dev/null || echo "0")
-      local current_time=$(date +%s)
-      local time_diff=$((current_time - health_timestamp))
-
-      # Consider leader unhealthy if no heartbeat in 2 minutes
-      [ $time_diff -lt 120 ]
-    }
-
-    # Check if current leader is still running and healthy
-    if [ -n "$CURRENT_LEADER" ] && echo "$RUNNING_NODES" | grep -q "^$CURRENT_LEADER$" && check_leader_health "$CURRENT_LEADER"; then
+    # Check if current leader is still running
+    if [ -n "$CURRENT_LEADER" ] && echo "$RUNNING_NODES" | grep -q "^$CURRENT_LEADER$"; then
       LEADER_NODE="$CURRENT_LEADER"
-      echo "Current leader $LEADER_NODE is still running and healthy"
+      echo "Current leader $LEADER_NODE is still running"
     else
-      if [ -n "$CURRENT_LEADER" ]; then
-        if ! echo "$RUNNING_NODES" | grep -q "^$CURRENT_LEADER$"; then
-          echo "Current leader $CURRENT_LEADER is not running"
-        else
-          echo "Current leader $CURRENT_LEADER failed health check"
-        fi
-      fi
-
       # Select new leader (lexicographically first running node)
       LEADER_NODE=$(echo "$RUNNING_NODES" | head -n1)
       echo "Electing new leader: $LEADER_NODE"
 
       # Update leader in Consul KV
       curl -s -X PUT -d "$LEADER_NODE" "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY" || echo "Failed to update leader in Consul"
-      curl -s -X PUT -d "$(date +%s)" "http://$CONSUL_ADDR/v1/kv/traefik/leader/health" >/dev/null
     fi
 
     echo "Leader node: $LEADER_NODE"
 
-    # For leadership changes, restart ALL allocations to update their configurations
-    # For cert changes, only restart followers
-    if [ $LEADER_CHANGED -eq 1 ]; then
-      echo "Restarting ALL allocations due to leadership change..."
-      ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running") | .ID')
-    else
-      echo "Restarting only follower allocations due to certificate change..."
-      ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r --arg leader "$LEADER_NODE" '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and .NodeName != $leader) | .ID')
-    fi
+    # Get follower allocation IDs (all nodes except the leader)
+    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r --arg leader "$LEADER_NODE" '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and .NodeName != $leader) | .ID')
 
     if [ -n "$ALLOC_IDS" ]; then
       echo "Follower allocation IDs to restart:"
