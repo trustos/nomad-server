@@ -38,7 +38,7 @@ job "traefik" {
       }
       config {
         command = "bash"
-        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 600 /mnt/glusterfs/traefik/acme-*.json"]
+        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 644 /mnt/glusterfs/traefik/acme-*.json"]
       }
       resources {
         cpu = 10
@@ -59,12 +59,26 @@ job "traefik" {
 echo "DEBUG: Running as user: $(whoami)"
 echo "DEBUG: Directory listing for /mnt/glusterfs/traefik/dynamic:"
 ls -ld /mnt/glusterfs/traefik/dynamic
+
+# Get leader from Consul KV or default to traefik-0 for initial setup
+CONSUL_ADDR="consul.service.consul:8500"
+LEADER_KEY="traefik/leader"
+LEADER_NODE=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
+
+# If no leader is set in Consul yet, try to determine it or use fallback
+if [ -z "$LEADER_NODE" ]; then
+  echo "No leader found in Consul KV, using traefik-0 as fallback"
+  LEADER_NODE="traefik-0"
+fi
+
+echo "DEBUG: Using leader node: $LEADER_NODE"
 echo "DEBUG: Attempting to write acme-redirect.yaml..."
-cat <<'EOF' > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
+
+cat <<EOF > /mnt/glusterfs/traefik/dynamic/acme-redirect.yaml
 http:
   routers:
     acme-challenge-redirect:
-      rule: PathPrefix(`/.well-known/acme-challenge/`)
+      rule: PathPrefix(\`/.well-known/acme-challenge/\`)
       entryPoints:
         - web
       priority: 10000
@@ -74,8 +88,70 @@ http:
     acme-leader-forward:
       loadBalancer:
         servers:
-          - url: "http://traefik-0.service.consul:80"
+          - url: "http://$LEADER_NODE.service.consul:80"
 EOF
+
+echo "DEBUG: ACME redirect configured for leader: $LEADER_NODE"
+EOT
+        ]
+      }
+      resources {
+        cpu    = 10
+        memory = 10
+      }
+    }
+
+    task "leader-election" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "bash"
+        args = ["-c", <<EOT
+# Leader election logic
+CONSUL_ADDR="consul.service.consul:8500"
+LEADER_KEY="traefik/leader"
+NODE_NAME="${NOMAD_NODE_NAME}"
+ALLOC_INDEX="${NOMAD_ALLOC_INDEX}"
+
+echo "DEBUG: Node: $NODE_NAME, Alloc Index: $ALLOC_INDEX"
+
+# Get current leader
+CURRENT_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
+
+if [ -z "$CURRENT_LEADER" ]; then
+  # No leader exists, try to become leader
+  echo "No leader found, attempting to become leader..."
+
+  # Use Consul's atomic CAS operation for leader election
+  SUCCESS=$(curl -s -X PUT -d "$NODE_NAME" "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?cas=0")
+
+  if [ "$SUCCESS" = "true" ]; then
+    echo "Successfully became leader"
+  else
+    echo "Failed to become leader, another node was faster"
+  fi
+else
+  echo "Current leader is: $CURRENT_LEADER"
+
+  # If this node was the previous leader and is restarting, reclaim leadership
+  if [ "$CURRENT_LEADER" = "$NODE_NAME" ]; then
+    echo "This node was the previous leader, maintaining leadership"
+  fi
+fi
+
+# Final leader check
+FINAL_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
+echo "Final leader: $FINAL_LEADER"
+
+if [ "$FINAL_LEADER" = "$NODE_NAME" ]; then
+  echo "This node is the ACME leader"
+  echo "true" > /tmp/is_leader
+else
+  echo "This node is a follower"
+  echo "false" > /tmp/is_leader
+fi
 EOT
         ]
       }
@@ -266,12 +342,54 @@ while true; do
   fi
 
   if [ $CHANGED -eq 1 ]; then
+    echo "$(date) - Certificate change detected, waiting for files to stabilize..."
+
+    # Wait for files to stabilize (not modified in the last 30 seconds)
+    STABLE=0
+    while [ $STABLE -eq 0 ]; do
+      STABLE=1
+      if [ -f "$ACME_FILE1" ] && [ $(find "$ACME_FILE1" -mmin -0.5 2>/dev/null | wc -l) -gt 0 ]; then
+        echo "$(date) - $ACME_FILE1 still being modified, waiting..."
+        STABLE=0
+      fi
+      if [ -f "$ACME_FILE2" ] && [ $(find "$ACME_FILE2" -mmin -0.5 2>/dev/null | wc -l) -gt 0 ]; then
+        echo "$(date) - $ACME_FILE2 still being modified, waiting..."
+        STABLE=0
+      fi
+      if [ $STABLE -eq 0 ]; then
+        sleep 10
+      fi
+    done
+
+    echo "$(date) - Files stabilized, proceeding with follower restarts..."
     NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json --namespace=traefik traefik 2>&1)
     echo "NOMAD job allocs output:"
     echo "$NOMAD_ALLOCS_JSON"
 
-    # For system jobs, use the lexicographically first node as leader
-    LEADER_NODE=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running") | .NodeName' | sort | head -n1)
+    # Use Consul KV to determine the leader
+    CONSUL_ADDR="consul.service.consul:8500"
+    LEADER_KEY="traefik/leader"
+
+    # Get current leader from Consul KV
+    CURRENT_LEADER=$(curl -s "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY?raw" 2>/dev/null || echo "")
+
+    # Get all running allocations
+    RUNNING_ALLOCS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running") | "\(.NodeName):\(.ID)"')
+    RUNNING_NODES=$(echo "$RUNNING_ALLOCS" | cut -d: -f1 | sort)
+
+    # Check if current leader is still running
+    if [ -n "$CURRENT_LEADER" ] && echo "$RUNNING_NODES" | grep -q "^$CURRENT_LEADER$"; then
+      LEADER_NODE="$CURRENT_LEADER"
+      echo "Current leader $LEADER_NODE is still running"
+    else
+      # Select new leader (lexicographically first running node)
+      LEADER_NODE=$(echo "$RUNNING_NODES" | head -n1)
+      echo "Electing new leader: $LEADER_NODE"
+
+      # Update leader in Consul KV
+      curl -s -X PUT -d "$LEADER_NODE" "http://$CONSUL_ADDR/v1/kv/$LEADER_KEY" || echo "Failed to update leader in Consul"
+    fi
+
     echo "Leader node: $LEADER_NODE"
 
     # Get follower allocation IDs (all nodes except the leader)
@@ -286,13 +404,41 @@ while true; do
 
     for alloc_id in $ALLOC_IDS; do
       echo "Restarting follower allocation: $alloc_id"
-      RESTART_OUTPUT=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id" 2>&1)
-      RESTART_EXIT_CODE=$?
-      echo "Restart output for $alloc_id:"
-      echo "$RESTART_OUTPUT"
-      if [ $RESTART_EXIT_CODE -ne 0 ]; then
-        echo "ERROR: Failed to restart allocation $alloc_id (exit code $RESTART_EXIT_CODE)"
-      fi
+
+      # Retry logic for allocation restart
+      RETRY_COUNT=0
+      MAX_RETRIES=3
+      RESTART_SUCCESS=0
+
+      while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ $RESTART_SUCCESS -eq 0 ]; do
+        if [ $RETRY_COUNT -gt 0 ]; then
+          echo "Retry attempt $RETRY_COUNT for allocation $alloc_id"
+          sleep $((RETRY_COUNT * 5))  # Exponential backoff
+        fi
+
+        RESTART_OUTPUT=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad alloc restart "$alloc_id" 2>&1)
+        RESTART_EXIT_CODE=$?
+
+        echo "Restart output for $alloc_id (attempt $((RETRY_COUNT + 1))):"
+        echo "$RESTART_OUTPUT"
+
+        if [ $RESTART_EXIT_CODE -eq 0 ]; then
+          echo "Successfully restarted allocation $alloc_id"
+          RESTART_SUCCESS=1
+        else
+          echo "ERROR: Failed to restart allocation $alloc_id (exit code $RESTART_EXIT_CODE)"
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+
+          # Check if it's a transient error worth retrying
+          if echo "$RESTART_OUTPUT" | grep -q -E "(connection refused|timeout|temporary failure)"; then
+            echo "Detected transient error, will retry..."
+          elif [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "CRITICAL: Failed to restart allocation $alloc_id after $MAX_RETRIES attempts"
+            # Log to system log for monitoring
+            logger "TRAEFIK-WATCHER: Failed to restart allocation $alloc_id after $MAX_RETRIES attempts"
+          fi
+        fi
+      done
     done
 
     echo "$(date) - Debouncing for $DEBOUNCE_SECONDS seconds..."
