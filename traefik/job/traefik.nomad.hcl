@@ -1,5 +1,4 @@
 job "traefik" {
-  type = "service"
   namespace = "traefik"
   datacenters = ["dc1"]
 
@@ -92,6 +91,14 @@ EOT
       driver = "docker"
 
       template {
+          data = <<EOH
+      TRAEFIK_TOKEN={{ key "nomad/traefik-token" }}
+      EOH
+          destination = "secrets/env"
+          env         = true
+      }
+
+      template {
         data = <<EOF
 entryPoints:
   web:
@@ -121,7 +128,7 @@ providers:
   nomad:
     endpoint:
       address: "http://nomad.service.consul:4646"
-      token: "{{ key "nomad/traefik-token" }}"
+      token: "${TRAEFIK_TOKEN}"
     watch: true
     namespaces:
       - "nomad-ops"
