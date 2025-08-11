@@ -185,13 +185,13 @@ EOF
             type        = "bind"
             source      = "/mnt/glusterfs/traefik/acme-stag.json"
             target      = "/etc/traefik/acme-stag.json"
-            readonly    = false
+            readonly    = {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}false{{ else }}true{{ end }}
           },
           {
             type        = "bind"
             source      = "/mnt/glusterfs/traefik/acme-prod.json"
             target      = "/etc/traefik/acme-prod.json"
-            readonly    = false
+            readonly    = {{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}false{{ else }}true{{ end }}
           },
           {
             type        = "bind"
