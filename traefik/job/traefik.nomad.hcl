@@ -270,7 +270,7 @@ while true; do
   fi
 
   if [ $CHANGED -eq 1 ]; then
-    NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json --namespace traefik 2>&1)
+    NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json --namespace=traefik traefik 2>&1)
     echo "NOMAD job allocs output:"
     echo "$NOMAD_ALLOCS_JSON"
 
