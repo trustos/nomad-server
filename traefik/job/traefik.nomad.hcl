@@ -70,7 +70,7 @@ http:
       rule: PathPrefix(`/.well-known/acme-challenge/`)
       entryPoints:
         - web
-      priority: 9223372036854776001
+      priority: 10000
       service: acme-leader-forward
 
   services:
