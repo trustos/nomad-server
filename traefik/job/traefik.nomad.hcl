@@ -128,7 +128,7 @@ providers:
   nomad:
     endpoint:
       address: "http://nomad.service.consul:4646"
-      token: "${TRAEFIK_TOKEN}"
+      token: {{ env `TRAEFIK_TOKEN` }}
     watch: true
     namespaces:
       - "nomad-ops"
