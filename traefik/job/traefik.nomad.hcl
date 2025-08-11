@@ -259,7 +259,7 @@ while true; do
     echo "NOMAD job allocs output:"
     echo "$NOMAD_ALLOCS_JSON"
 
-    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID')
+    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik-follower" and .ClientStatus=="running") | .ID')
     echo "Follower allocation IDs to restart:"
     echo "$ALLOC_IDS"
 
