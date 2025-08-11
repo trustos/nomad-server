@@ -2,12 +2,13 @@ job "traefik" {
   namespace = "traefik"
   datacenters = ["dc1"]
 
-  constraint {
-    distinct_hosts = true
-  }
+  group "traefik" {
+    count = 3
 
-  group "traefik-leader" {
-    count = 1
+    constraint {
+      distinct_hosts = true
+    }
+
     network {
       port "http" {
         static = 80
@@ -86,7 +87,7 @@ EOT
       }
     }
 
-    task "traefik-leader" {
+    task "traefik" {
       driver = "docker"
 
       template {
@@ -102,6 +103,9 @@ EOT
 entryPoints:
   web:
     address: ":80"
+    {{ if ne (env "NOMAD_ALLOC_INDEX") "0" }}
+    allowACMEByPass: true
+    {{ end }}
 
   websecure:
     address: ":443"
@@ -135,6 +139,7 @@ providers:
     watch: true
 
 certificatesResolvers:
+{{ if eq (env "NOMAD_ALLOC_INDEX") "0" }}
   cert-prod:
     acme:
       email: trustos@gmail.com
@@ -148,12 +153,24 @@ certificatesResolvers:
       caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
       httpChallenge:
         entryPoint: web
+{{ else }}
+  cert-prod:
+    acme:
+      email: "no-reply@example.com"
+      storage: /etc/traefik/acme-prod.json
+      httpChallenge: {}
+  cert-stag:
+    acme:
+      email: "no-reply@example.com"
+      storage: /etc/traefik/acme-stag.json
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      httpChallenge: {}
+{{ end }}
 
 EOF
         destination = "local/traefik.yaml"
         change_mode = "restart"
       }
-
       config {
         image = "traefik:v3.4.3"
         ports = ["http", "https"]
@@ -186,11 +203,11 @@ EOF
       }
 
       service {
-        name = "traefik-0"
+        name = "traefik-${NOMAD_ALLOC_INDEX}"
         port = "http"
         tags = [
           "acme",
-          "role=0"
+          "role=${NOMAD_ALLOC_INDEX}"
         ]
         check {
           type     = "http"
@@ -205,140 +222,12 @@ EOF
         memory = 512
       }
     }
+
+
   }
 
-  group "traefik-followers" {
-    count = 2
-
-
-    network {
-      port "http" {
-        static = 80
-      }
-      port "https" {
-        static = 443
-      }
-    }
-
-    task "traefik-follower" {
-      driver = "docker"
-
-      template {
-          data = <<EOH
-      TRAEFIK_TOKEN={{ key "nomad/traefik-token" }}
-      EOH
-          destination = "secrets/env"
-          env         = true
-      }
-
-      template {
-        data = <<EOF
-entryPoints:
-  web:
-    address: ":80"
-    allowACMEByPass: true
-
-  websecure:
-    address: ":443"
-
-ping:
-  entryPoint: web
-
-log:
-  level: DEBUG
-
-api:
-  dashboard: true
-  insecure: false
-
-providers:
-  providersThrottleDuration: 1s
-  file:
-    directory: "/etc/traefik/dynamic"
-    watch: true
-  nomad:
-    endpoint:
-      address: "http://nomad.service.consul:4646"
-      token: {{ key "nomad/traefik-token" }}
-    watch: true
-    namespaces:
-      - "nomad-ops"
-      - "default"
-  consulCatalog:
-    endpoint:
-        address: "consul.service.consul:8500"
-    watch: true
-
-certificatesResolvers:
-  cert-prod:
-    acme:
-      email: "no-reply@example.com"
-      storage: /etc/traefik/acme-prod.json
-      httpChallenge: {}
-  cert-stag:
-    acme:
-      email: "no-reply@example.com"
-      storage: /etc/traefik/acme-stag.json
-      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
-      httpChallenge: {}
-
-EOF
-        destination = "local/traefik.yaml"
-        change_mode = "restart"
-      }
-
-      config {
-        image = "traefik:v3.4.3"
-        ports = ["http", "https"]
-        mounts = [
-          {
-            type        = "bind"
-            source      = "local/traefik.yaml"
-            target      = "/etc/traefik/traefik.yaml"
-            readonly    = true
-          },
-          {
-            type        = "bind"
-            source      = "/mnt/glusterfs/traefik/acme-stag.json"
-            target      = "/etc/traefik/acme-stag.json"
-            readonly    = true
-          },
-          {
-            type        = "bind"
-            source      = "/mnt/glusterfs/traefik/acme-prod.json"
-            target      = "/etc/traefik/acme-prod.json"
-            readonly    = true
-          },
-          {
-            type        = "bind"
-            source      = "/mnt/glusterfs/traefik/dynamic"
-            target      = "/etc/traefik/dynamic"
-            readonly    = false
-          }
-        ]
-      }
-
-      service {
-        name = "traefik-${NOMAD_ALLOC_INDEX + 1}"
-        port = "http"
-        tags = [
-          "acme",
-          "role=${NOMAD_ALLOC_INDEX + 1}"
-        ]
-        check {
-          type     = "http"
-          path     = "/ping"
-          interval = "10s"
-          timeout  = "2s"
-        }
-        enable_tag_override = true
-      }
-      resources {
-        cpu    = 384
-        memory = 512
-      }
-    }
-
+  group "acme-watcher" {
+    count = 1
     task "acme-follower-restart-watcher" {
       driver = "raw_exec"
       config {
@@ -392,7 +281,7 @@ while true; do
     echo "NOMAD job allocs output:"
     echo "$NOMAD_ALLOCS_JSON"
 
-    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik-followers" and .ClientStatus=="running") | .ID')
+    ALLOC_IDS=$(echo "$NOMAD_ALLOCS_JSON" | jq -r '.[] | select(.TaskGroup=="traefik" and .ClientStatus=="running" and (.Name | test("\\[0\\]$") | not)) | .ID')
     echo "Follower allocation IDs to restart:"
     echo "$ALLOC_IDS"
 
