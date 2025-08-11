@@ -92,16 +92,6 @@ job "nomad-ops" {
         // Define the http service for the api
         "traefik.http.routers.nomadops-api.rule=Host(`ops.rs-estates`) && PathPrefix(`/api`)",
         "traefik.http.routers.nomadops-api.entrypoints=web",
-
-        "traefik.http.routers.nomadops-inet.rule=Host(`ops.nomad.rs-estates.com`)",
-        "traefik.http.routers.nomadops-inet.entrypoints=websecure",
-        "traefik.http.routers.nomadops-inet.tls=true",
-        "traefik.http.routers.nomadops-inet.tls.certresolver=cert-stag",
-
-        # Add middleware to redirect HTTP to HTTPS
-        "traefik.http.routers.nomadops-inet-redirect.rule=Host(`ops.nomad.rs-estates.com`)",
-        "traefik.http.routers.nomadops-inet-redirect.entrypoints=web",
-        "traefik.http.routers.nomadops-inet-redirect.middlewares=redirect-to-https@file",
       ]
 
       port = "http"
