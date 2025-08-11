@@ -1,11 +1,14 @@
 job "traefik" {
-  type = "system"
+  type = "service"
   namespace = "traefik"
   datacenters = ["dc1"]
 
-
-
   group "traefik" {
+    count = 3
+
+    constraint {
+      distinct_hosts = true
+    }
 
     network {
       port "http" {
@@ -67,7 +70,7 @@ http:
       rule: PathPrefix(`/.well-known/acme-challenge/`)
       entryPoints:
         - web
-      priority: 10000
+      priority: 9223372036854776001
       service: acme-leader-forward
 
   services:
@@ -87,14 +90,6 @@ EOT
 
     task "traefik" {
       driver = "docker"
-
-      template {
-         data = <<EOH
-     TRAEFIK_TOKEN={{ key "nomad/traefik-token" }}
-     EOH
-         destination = "secrets/env"
-         env         = true
-       }
 
       template {
         data = <<EOF
@@ -126,7 +121,7 @@ providers:
   nomad:
     endpoint:
       address: "http://nomad.service.consul:4646"
-      token: "${TRAEFIK_TOKEN}"
+      token: "{{ key "nomad/traefik-token" }}"
     watch: true
     namespaces:
       - "nomad-ops"
@@ -199,6 +194,7 @@ EOF
           }
         ]
       }
+
       service {
         name = "traefik-${NOMAD_ALLOC_INDEX}"
         port = "http"
@@ -274,7 +270,7 @@ while true; do
   fi
 
   if [ $CHANGED -eq 1 ]; then
-    NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json traefik 2>&1)
+    NOMAD_ALLOCS_JSON=$(NOMAD_ADDR="http://nomad.service.consul:4646" NOMAD_TOKEN="${MGMT_TOKEN}" nomad job allocs -json --namespace traefik 2>&1)
     echo "NOMAD job allocs output:"
     echo "$NOMAD_ALLOCS_JSON"
 

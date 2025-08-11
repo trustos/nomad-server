@@ -181,9 +181,14 @@ EOH
           "traefik.http.routers.nocobase.entrypoints=web",
 
           "traefik.http.routers.nocobase-inet.rule=Host(`crm.rs-estates.com`)",
-          "traefik.http.routers.nocobase-inet.entrypoints=web,websecure",
+          "traefik.http.routers.nocobase-inet.entrypoints=websecure",
           "traefik.http.routers.nocobase-inet.tls=true",
           "traefik.http.routers.nocobase-inet.tls.certresolver=cert-stag",
+
+          # Add middleware to redirect HTTP to HTTPS
+          "traefik.http.routers.nocobase-inet-redirect.rule=Host(`crm.rs-estates.com`)",
+          "traefik.http.routers.nocobase-inet-redirect.entrypoints=web",
+          "traefik.http.routers.nocobase-inet-redirect.middlewares=redirect-to-https@file",
         ]
         check {
           type     = "http"
