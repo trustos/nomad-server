@@ -75,9 +75,6 @@ EOH
       }
     }
 
-    fr0x36ufqbuv
-
-
     task "upload-to-oci" {
       driver = "raw_exec"
       user = "root"
