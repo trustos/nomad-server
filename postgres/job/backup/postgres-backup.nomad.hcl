@@ -88,6 +88,10 @@ job "postgres-backup" {
       driver = "raw_exec"
       user   = "root"
 
+      lifecycle {
+        hook = "poststart"
+      }
+
       config {
         command = "bash"
         args    = ["local/upload.sh"]
@@ -127,9 +131,46 @@ job "postgres-backup" {
               oci os object put -bn "$BUCKET_NAME" --file "$backup_file" --name "$(basename "$backup_file")"
             done
 
-            echo "All files uploaded successfully. Cleaning up local backups..."
+            echo "All files uploaded successfully. Starting retention cleanup..."
+
+            # Get all backup files from bucket and extract unique database names
+            ALL_BACKUPS=$(oci os object list -bn "$BUCKET_NAME" --query "data[].name" --raw-output)
+            DB_NAMES=$(echo "$ALL_BACKUPS" | grep -E '.*-backup-.*\.sql$' | sed -E 's/-backup-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}\.sql$//' | sort -u)
+
+            for DB_NAME in $DB_NAMES; do
+              echo "Processing retention for database: $DB_NAME"
+
+              # Get all backup files for this database from the previously fetched list
+              BACKUP_FILES=$(echo "$ALL_BACKUPS" | grep "^${DB_NAME}-backup-.*\.sql$" | sort -r)
+
+              # Check if we got any results and count them properly
+              if [ -n "$BACKUP_FILES" ]; then
+                BACKUP_COUNT=$(echo "$BACKUP_FILES" | wc -l)
+                echo "Found $BACKUP_COUNT backups for $DB_NAME"
+
+                if [ "$BACKUP_COUNT" -gt 7 ]; then
+                  echo "Keeping newest 7, deleting $(($BACKUP_COUNT - 7)) old backups..."
+
+                  # Skip first 7 (newest) and delete the rest
+                  FILES_TO_DELETE=$(echo "$BACKUP_FILES" | tail -n +8)
+
+                  for file_to_delete in $FILES_TO_DELETE; do
+                    if [ -n "$file_to_delete" ]; then
+                      echo "Deleting old backup: $file_to_delete"
+                      oci os object delete -bn "$BUCKET_NAME" --object-name "$file_to_delete" --force
+                    fi
+                  done
+                else
+                  echo "No cleanup needed for $DB_NAME (has $BACKUP_COUNT backups, keeping all)"
+                fi
+              else
+                echo "No backups found for database: $DB_NAME"
+              fi
+            done
+
+            echo "Retention cleanup complete. Cleaning up local backups..."
             rm -f "$BACKUP_DIR"/*.sql
-            echo "Cleanup complete."
+            echo "Local cleanup complete."
 
           else
             echo "No backup files found to upload."
