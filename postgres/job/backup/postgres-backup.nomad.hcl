@@ -40,7 +40,16 @@ job "postgres-backup" {
         args = [
           "-c",
           <<-EOT
-          pg_dumpall -h postgres.service.consul -U "$PGUSER" > /backups/postgres-backup-$(date +%F-%H%M%S).sql
+          # Get list of databases, excluding templates and 'postgres'
+          DBS=$(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')")
+
+          for DB in $DBS; do
+            DB_TRIMMED=$(echo $DB | xargs) # Remove whitespace
+            if [ -n "$DB_TRIMMED" ]; then
+              echo "Dumping database: $DB_TRIMMED"
+              pg_dump -h postgres.service.consul -U "$PGUSER" "$DB_TRIMMED" > /backups/${DB_TRIMMED}-backup-$(date +%F-%H%M%S).sql
+            fi
+          done
           EOT
         ]
         mounts = [
@@ -66,6 +75,9 @@ EOH
       }
     }
 
+    fr0x36ufqbuv
+
+
     task "upload-to-oci" {
       driver = "raw_exec"
       user = "root"
@@ -75,11 +87,7 @@ EOH
         args = [
           "-c",
           <<-EOT
-          echo "Current user: $(whoami)"
-          id
           export PATH=$PATH:/root/.local/bin
-          echo "PATH: $PATH"
-          which oci
           export OCI_CLI_AUTH=instance_principal
           COMPARTMENT_ID=$(curl -sL http://169.254.169.254/opc/v1/instance/metadata/COMPARTMENT_OCID)
           NAMESPACE=$(oci os ns get --query "data" --raw-output)
