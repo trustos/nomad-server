@@ -56,6 +56,10 @@ job "postgres-backup" {
           #!/bin/bash
           set -euo pipefail
 
+          # Clean up old backup files first
+          echo "Cleaning up old backup files..."
+          find /backups -name "*.sql" -mtime +0 -delete 2>/dev/null || true
+
           for DB in $(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')"); do
             DB=$(echo "$DB" | xargs) # Trim whitespace
             if [ -n "$DB" ]; then
@@ -126,15 +130,21 @@ job "postgres-backup" {
           if compgen -G "$BACKUP_DIR/*.sql" > /dev/null; then
             echo "Found backup files, starting upload..."
 
+            # Only upload the newest backup files (created in the last 5 minutes)
             for backup_file in "$BACKUP_DIR"/*.sql; do
-              echo "Uploading $(basename "$backup_file") ..."
-              oci os object put -bn "$BUCKET_NAME" --file "$backup_file" --name "$(basename "$backup_file")"
+              # Check if file was created in the last 5 minutes
+              if [ $(find "$backup_file" -newermt "5 minutes ago" | wc -l) -gt 0 ]; then
+                echo "Uploading $(basename "$backup_file") ..."
+                oci os object put -bn "$BUCKET_NAME" --file "$backup_file" --name "$(basename "$backup_file")" --force
+              else
+                echo "Skipping old backup file: $(basename "$backup_file")"
+              fi
             done
 
             echo "All files uploaded successfully. Starting retention cleanup..."
 
             # Get all backup files from bucket and extract unique database names
-            ALL_BACKUPS=$(oci os object list -bn "$BUCKET_NAME" --query "data[].name" --raw-output)
+            ALL_BACKUPS=$(oci os object list -bn "$BUCKET_NAME" --query "data[].name" --raw-output | jq -r '.[]')
             DB_NAMES=$(echo "$ALL_BACKUPS" | grep -E '.*-backup-.*\.sql$' | sed -E 's/-backup-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}\.sql$//' | sort -u)
 
             for DB_NAME in $DB_NAMES; do
@@ -168,8 +178,9 @@ job "postgres-backup" {
               fi
             done
 
-            echo "Retention cleanup complete. Cleaning up local backups..."
-            rm -f "$BACKUP_DIR"/*.sql
+            echo "Retention cleanup complete. Cleaning up uploaded local backups..."
+            # Only remove files that were successfully uploaded (newer than 5 minutes ago)
+            find "$BACKUP_DIR" -name "*.sql" -newermt "5 minutes ago" -delete
             echo "Local cleanup complete."
 
           else
