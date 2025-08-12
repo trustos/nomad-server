@@ -44,7 +44,7 @@ for DB in $(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c "SELE
   DB=$(echo $DB | xargs) # Trim whitespace
   if [ -n "$DB" ]; then
     echo "Dumping database: $DB"
-    pg_dump -h postgres.service.consul -U "$PGUSER" "$DB" > /backups/${DB}-backup-$(date +%F-%H%M%S).sql
+    pg_dump -h postgres.service.consul -U "$PGUSER" "$DB" > /backups/$${DB}-backup-$(date +%F-%H%M%S).sql
   fi
 done
 EOT
