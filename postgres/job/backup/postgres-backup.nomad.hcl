@@ -116,13 +116,26 @@ job "postgres-backup" {
             echo "Bucket '$BUCKET_NAME' exists."
           fi
 
-          latest_backup=$(ls -t /mnt/glusterfs/postgres/backups/*.sql | head -n1)
-          if [ -f "$latest_backup" ]; then
-            oci os object put -bn "$BUCKET_NAME" --file "$latest_backup" --name "$(basename "$latest_backup")"
+          BACKUP_DIR="/mnt/glusterfs/postgres/backups"
+
+          # Check if there are SQL files
+          if compgen -G "$BACKUP_DIR/*.sql" > /dev/null; then
+            echo "Found backup files, starting upload..."
+
+            for backup_file in "$BACKUP_DIR"/*.sql; do
+              echo "Uploading $(basename "$backup_file") ..."
+              oci os object put -bn "$BUCKET_NAME" --file "$backup_file" --name "$(basename "$backup_file")"
+            done
+
+            echo "All files uploaded successfully. Cleaning up local backups..."
+            rm -f "$BACKUP_DIR"/*.sql
+            echo "Cleanup complete."
+
           else
-            echo "No backup file found to upload."
-            exit 1
+            echo "No backup files found to upload."
+            exit 0
           fi
+
         EOH
         destination = "local/upload.sh"
         perms       = "755"
