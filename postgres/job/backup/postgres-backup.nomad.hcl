@@ -40,8 +40,7 @@ job "postgres-backup" {
         args = [
           "-c",
           <<-EOT
-          export PGPASSWORD=$(consul kv get postgres/adminpassword)
-          pg_dumpall -h postgres.service.consul -U $(consul kv get postgres/adminuser) > /backups/postgres-backup-$(date +%F-%H%M%S).sql
+          pg_dumpall -h postgres.service.consul -U "$PGUSER" > /backups/postgres-backup-$(date +%F-%H%M%S).sql
           EOT
         ]
         mounts = [
@@ -52,6 +51,14 @@ job "postgres-backup" {
             readonly = false
           }
         ]
+      }
+      template {
+        data = <<EOH
+PGUSER={{ key "postgres/adminuser" }}
+PGPASSWORD={{ key "postgres/adminpassword" }}
+EOH
+        destination = "secrets/env"
+        env         = true
       }
       resources {
         cpu    = 200
