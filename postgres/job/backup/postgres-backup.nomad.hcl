@@ -73,9 +73,10 @@ EOH
         args = [
           "-c",
           <<-EOT
+          sudo su
           export OCI_CLI_AUTH=instance_principal
           COMPARTMENT_ID=$(curl -sL http://169.254.169.254/opc/v1/instance/metadata/COMPARTMENT_OCID)
-          NAMESPACE=$(oci os ns get --query "data" --raw-output)
+          NAMESPACE=$(sudo oci os ns get --query "data" --raw-output)
           BUCKET_NAME="postgres"
 
           # Check if bucket exists using jq for robust JSON handling
