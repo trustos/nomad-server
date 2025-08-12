@@ -68,15 +68,16 @@ EOH
 
     task "upload-to-oci" {
       driver = "raw_exec"
+      user = "root"
+
       config {
         command = "bash"
         args = [
           "-c",
           <<-EOT
-          sudo su
           export OCI_CLI_AUTH=instance_principal
           COMPARTMENT_ID=$(curl -sL http://169.254.169.254/opc/v1/instance/metadata/COMPARTMENT_OCID)
-          NAMESPACE=$(sudo oci os ns get --query "data" --raw-output)
+          NAMESPACE=$(oci os ns get --query "data" --raw-output)
           BUCKET_NAME="postgres"
 
           # Check if bucket exists using jq for robust JSON handling
