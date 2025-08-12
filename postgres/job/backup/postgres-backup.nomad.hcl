@@ -78,12 +78,15 @@ EOH
           NAMESPACE=$(oci os ns get --query "data" --raw-output)
           BUCKET_NAME="postgres"
 
-          # Check if bucket exists
-          BUCKET_EXISTS=$(oci os bucket list --compartment-id "$COMPARTMENT_ID" --namespace-name "$NAMESPACE" --query "data[?name=='$BUCKET_NAME']" --raw-output)
+          # Check if bucket exists using jq for robust JSON handling
+          BUCKET_JSON=$(oci os bucket list --compartment-id "$COMPARTMENT_ID" --namespace-name "$NAMESPACE" --query "data[?name=='$BUCKET_NAME']")
+          BUCKET_COUNT=$(echo "$BUCKET_JSON" | jq 'length')
 
-          if [ -z "$BUCKET_EXISTS" ]; then
+          if [ "$BUCKET_COUNT" -eq 0 ]; then
             echo "Bucket '$BUCKET_NAME' does not exist. Creating it..."
             oci os bucket create --compartment-id "$COMPARTMENT_ID" --namespace-name "$NAMESPACE" --name "$BUCKET_NAME"
+          else
+            echo "Bucket '$BUCKET_NAME' exists."
           fi
 
           latest_backup=$(ls -t /mnt/glusterfs/postgres/backups/postgres-backup-*.sql | head -n1)
