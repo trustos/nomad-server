@@ -75,6 +75,8 @@ EOH
         args = [
           "-c",
           <<-EOT
+          echo "Current user: $(whoami)"
+          id
           export OCI_CLI_AUTH=instance_principal
           COMPARTMENT_ID=$(curl -sL http://169.254.169.254/opc/v1/instance/metadata/COMPARTMENT_OCID)
           NAMESPACE=$(oci os ns get --query "data" --raw-output)
