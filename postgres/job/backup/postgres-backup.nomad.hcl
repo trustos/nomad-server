@@ -77,6 +77,7 @@ EOH
           <<-EOT
           echo "Current user: $(whoami)"
           id
+          export PATH=$PATH:/root/.local/bin
           echo "PATH: $PATH"
           which oci
           export OCI_CLI_AUTH=instance_principal
