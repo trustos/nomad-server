@@ -40,13 +40,13 @@ job "postgres-backup" {
         args = [
           "-c",
           <<-EOT
-          for DB in $(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')"); do
-            DB=$(echo $DB | xargs) # Trim whitespace
-            if [ -n "$DB" ]; then
-              echo "Dumping database: $DB"
-              pg_dump -h postgres.service.consul -U "$PGUSER" "$DB" > /backups/${DB}-backup-$(date +%F-%H%M%S).sql
-            fi
-          done
+for DB in $(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')"); do
+  DB=$(echo $DB | xargs) # Trim whitespace
+  if [ -n "$DB" ]; then
+    echo "Dumping database: $DB"
+    pg_dump -h postgres.service.consul -U "$PGUSER" "$DB" > /backups/${DB}-backup-$(date +%F-%H%M%S).sql
+  fi
+done
           EOT
         ]
         mounts = [
