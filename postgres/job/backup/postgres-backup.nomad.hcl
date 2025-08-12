@@ -131,22 +131,6 @@ job "postgres-backup" {
             rm -f "$BACKUP_DIR"/*.sql
             echo "Cleanup complete."
 
-            # Keep only last 7 backups in the bucket
-            for DB in $(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c \
-              "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')"); do
-              DB=$(echo "$DB" | xargs)
-              if [ -n "$DB" ]; then
-                echo "Checking old backups for $DB ..."
-                backup_objects=$(oci os object list -bn "$BUCKET_NAME" \
-                  --query "data[].name" --raw-output | grep "^${DB}-backup-" | sort -r)
-
-                echo "$backup_objects" | tail -n +8 | while read -r obj; do
-                  [ -n "$obj" ] && echo "Deleting old backup: $obj" && \
-                    oci os object delete -bn "$BUCKET_NAME" --name "$obj" --force
-                done
-              fi
-            done
-
           else
             echo "No backup files found to upload."
             exit 0
