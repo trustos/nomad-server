@@ -3,7 +3,7 @@ job "postgres-backup" {
   type        = "batch"
 
   periodic {
-    crons            = ["*/2 * * * *"]
+    crons            = ["0 4 * * *"]
     prohibit_overlap = true
     time_zone        = "UTC"
   }
