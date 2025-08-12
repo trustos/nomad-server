@@ -39,7 +39,7 @@ job "postgres-backup" {
         command = "bash"
         args = [
           "-c",
-          <<-EOT
+<<EOT
 for DB in $(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')"); do
   DB=$(echo $DB | xargs) # Trim whitespace
   if [ -n "$DB" ]; then
@@ -47,7 +47,7 @@ for DB in $(psql -h postgres.service.consul -U "$PGUSER" -d postgres -t -c "SELE
     pg_dump -h postgres.service.consul -U "$PGUSER" "$DB" > /backups/${DB}-backup-$(date +%F-%H%M%S).sql
   fi
 done
-          EOT
+EOT
         ]
         mounts = [
           {
