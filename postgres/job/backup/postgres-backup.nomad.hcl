@@ -138,8 +138,7 @@ job "postgres-backup" {
               if [ -n "$DB" ]; then
                 echo "Checking old backups for $DB ..."
                 backup_objects=$(oci os object list -bn "$BUCKET_NAME" \
-                  --query "data[?starts_with(&name, '${DB}-backup-')].name" \
-                  --raw-output | sort -r)
+                  --query "data[].name" --raw-output | grep "^${DB}-backup-" | sort -r)
 
                 echo "$backup_objects" | tail -n +8 | while read -r obj; do
                   [ -n "$obj" ] && echo "Deleting old backup: $obj" && \
