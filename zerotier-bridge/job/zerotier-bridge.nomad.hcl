@@ -1,62 +1,12 @@
-job "zerotier" {
+job "zerotier-bridge" {
   datacenters = ["dc1"]
   type = "system"
 
-  group "zt" {
-
-    task "zerotier" {
-      driver = "raw_exec"
-
-      config {
-        command = "/bin/bash"
-        args = ["-c", <<EOT
-set -e
-
-# Clean up /tmp in case previous runs left files
-sudo rm -f /tmp/zt-gpg-key /tmp/zt-sources-list
-
-# 1. Install ZeroTier if not present
-if ! command -v zerotier-one >/dev/null 2>&1; then
-  echo "Installing ZeroTier..."
-  curl -s https://install.zerotier.com | sudo bash
-fi
-
-# 2. Join the network (replace with your actual network ID)
-NETWORK_ID="35c192ce9b9bd219"
-if command -v zerotier-cli >/dev/null 2>&1; then
-  if ! sudo zerotier-cli listnetworks | grep -q "$NETWORK_ID"; then
-    echo "Joining ZeroTier network $NETWORK_ID"
-    sudo zerotier-cli join "$NETWORK_ID"
-  fi
-else
-  echo "zerotier-cli not found, install may have failed."
-  exit 1
-fi
-
-# 3. Keep the task alive (optional, or just let it exit)
-sleep infinity
-EOT
-        ]
-      }
-
-      resources {
-        cpu    = 100
-        memory = 512
-      }
-
-      restart {
-        attempts = 3
-        interval = "30s"
-        delay    = "15s"
-        mode     = "fail"
-      }
-    }
+  group "zt-bridge" {
 
     task "zerotier-nat-forward" {
       driver = "raw_exec"
-      lifecycle {
-        hook = "poststart"
-      }
+
       config {
         command = "bash"
         args = [
@@ -75,9 +25,11 @@ while true; do
   sleep 10
 done
 
+echo "Found ZeroTier interface: $ZT_IFACE with IP: $ZT_IP"
+
 # --- Wait for Traefik container and get its bridge IP ---
 for i in {1..30}; do
-  TRAEFIK_CONTAINER_ID=$(docker ps | awk '$2 == "traefik:v3.4.3" {print $1}')
+  TRAEFIK_CONTAINER_ID=$(docker ps | awk '$2 ~ /^traefik/ {print $1}')
   if [ -n "$TRAEFIK_CONTAINER_ID" ]; then
     TRAEFIK_DOCKER_IP=$(docker inspect "$TRAEFIK_CONTAINER_ID" | jq -r '.[].NetworkSettings.Networks.bridge.IPAddress')
     if [ -n "$TRAEFIK_DOCKER_IP" ] && [ "$TRAEFIK_DOCKER_IP" != "null" ]; then
@@ -87,35 +39,70 @@ for i in {1..30}; do
   echo "Waiting for Traefik container and bridge IP..."
   sleep 2
 done
+
 if [ -z "$TRAEFIK_DOCKER_IP" ] || [ "$TRAEFIK_DOCKER_IP" = "null" ]; then
   echo "Could not determine Traefik container IP!"
   exit 1
 fi
 
-# --- Enable IP forwarding ---
-sudo sysctl -w net.ipv4.ip_forward=1
-sudo grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+echo "Found Traefik container IP: $TRAEFIK_DOCKER_IP"
 
-# --- Clean up old rules ---
+# --- Ensure IP forwarding is enabled ---
+sudo sysctl -w net.ipv4.ip_forward=1
+
+# --- Clean up old rules (if any exist) ---
+echo "Cleaning up old iptables rules..."
 sudo iptables -t nat -D PREROUTING -i $ZT_IFACE -p tcp --dport 80 -j DNAT --to-destination $TRAEFIK_DOCKER_IP:80 2>/dev/null || true
 sudo iptables -t nat -D PREROUTING -i $ZT_IFACE -p tcp --dport 443 -j DNAT --to-destination $TRAEFIK_DOCKER_IP:443 2>/dev/null || true
 sudo iptables -t nat -D POSTROUTING -s 172.17.0.0/16 -o $ZT_IFACE -j MASQUERADE 2>/dev/null || true
 
 # --- Add NAT rules ---
+echo "Adding NAT forwarding rules..."
 sudo iptables -t nat -A PREROUTING -i $ZT_IFACE -p tcp --dport 80 -j DNAT --to-destination $TRAEFIK_DOCKER_IP:80
 sudo iptables -t nat -A PREROUTING -i $ZT_IFACE -p tcp --dport 443 -j DNAT --to-destination $TRAEFIK_DOCKER_IP:443
 sudo iptables -t nat -A POSTROUTING -s 172.17.0.0/16 -o $ZT_IFACE -j MASQUERADE
 
+echo "ZeroTier bridge setup complete!"
 echo "Forwarding ZeroTier ($ZT_IFACE/$ZT_IP) ports 80/443 to Traefik at $TRAEFIK_DOCKER_IP"
 
-# --- Keep task alive ---
-while true; do sleep 3600; done
+# --- Keep task alive and monitor for changes ---
+while true; do
+  # Check if Traefik container IP has changed
+  NEW_TRAEFIK_CONTAINER_ID=$(docker ps | awk '$2 ~ /^traefik/ {print $1}')
+  if [ -n "$NEW_TRAEFIK_CONTAINER_ID" ]; then
+    NEW_TRAEFIK_DOCKER_IP=$(docker inspect "$NEW_TRAEFIK_CONTAINER_ID" | jq -r '.[].NetworkSettings.Networks.bridge.IPAddress')
+    if [ -n "$NEW_TRAEFIK_DOCKER_IP" ] && [ "$NEW_TRAEFIK_DOCKER_IP" != "null" ] && [ "$NEW_TRAEFIK_DOCKER_IP" != "$TRAEFIK_DOCKER_IP" ]; then
+      echo "Traefik IP changed from $TRAEFIK_DOCKER_IP to $NEW_TRAEFIK_DOCKER_IP, updating NAT rules..."
+
+      # Clean up old rules
+      sudo iptables -t nat -D PREROUTING -i $ZT_IFACE -p tcp --dport 80 -j DNAT --to-destination $TRAEFIK_DOCKER_IP:80 2>/dev/null || true
+      sudo iptables -t nat -D PREROUTING -i $ZT_IFACE -p tcp --dport 443 -j DNAT --to-destination $TRAEFIK_DOCKER_IP:443 2>/dev/null || true
+
+      # Add new rules
+      sudo iptables -t nat -A PREROUTING -i $ZT_IFACE -p tcp --dport 80 -j DNAT --to-destination $NEW_TRAEFIK_DOCKER_IP:80
+      sudo iptables -t nat -A PREROUTING -i $ZT_IFACE -p tcp --dport 443 -j DNAT --to-destination $NEW_TRAEFIK_DOCKER_IP:443
+
+      TRAEFIK_DOCKER_IP=$NEW_TRAEFIK_DOCKER_IP
+      echo "NAT rules updated to new Traefik IP: $TRAEFIK_DOCKER_IP"
+    fi
+  fi
+
+  sleep 30
+done
 EOT
         ]
       }
+
       resources {
-        cpu    = 20
-        memory = 32
+        cpu    = 50
+        memory = 64
+      }
+
+      restart {
+        attempts = 5
+        interval = "1m"
+        delay    = "15s"
+        mode     = "delay"
       }
     }
   }
