@@ -1,4 +1,5 @@
 job "zerotier-bridge" {
+  namespace = "traefik"
   datacenters = ["dc1"]
   type = "system"
 
