@@ -114,12 +114,22 @@ job "postgres-backup" {
           BUCKET_NAME="postgres"
 
           # Check if bucket exists
-          BUCKET_JSON=$(oci os bucket list --compartment-id "$COMPARTMENT_ID" --namespace-name "$NAMESPACE" --query "data[?name=='$BUCKET_NAME']")
-          BUCKET_COUNT=$(echo "$BUCKET_JSON" | jq 'length')
+          BUCKET_JSON=$(oci os bucket list --compartment-id "$COMPARTMENT_ID" --namespace-name "$NAMESPACE" --query "data[?name=='$BUCKET_NAME']" 2>/dev/null || echo "[]")
+          BUCKET_COUNT=$(echo "$BUCKET_JSON" | jq -r 'length // 0' 2>/dev/null || echo "0")
+
+          # Ensure BUCKET_COUNT is a valid integer
+          if ! [[ "$BUCKET_COUNT" =~ ^[0-9]+$ ]]; then
+            BUCKET_COUNT=0
+          fi
 
           if [ "$BUCKET_COUNT" -eq 0 ]; then
             echo "Bucket '$BUCKET_NAME' does not exist. Creating it..."
-            oci os bucket create --compartment-id "$COMPARTMENT_ID" --namespace-name "$NAMESPACE" --name "$BUCKET_NAME"
+            if oci os bucket create --compartment-id "$COMPARTMENT_ID" --namespace-name "$NAMESPACE" --name "$BUCKET_NAME"; then
+              echo "Bucket '$BUCKET_NAME' created successfully."
+            else
+              echo "Failed to create bucket '$BUCKET_NAME'. Exiting."
+              exit 1
+            fi
           else
             echo "Bucket '$BUCKET_NAME' exists."
           fi
@@ -144,8 +154,14 @@ job "postgres-backup" {
             echo "All files uploaded successfully. Starting retention cleanup..."
 
             # Get all backup files from bucket and extract unique database names
-            ALL_BACKUPS=$(oci os object list -bn "$BUCKET_NAME" --query "data[].name" --raw-output | jq -r '.[]')
-            DB_NAMES=$(echo "$ALL_BACKUPS" | grep -E '.*-backup-.*\.sql$' | sed -E 's/-backup-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}\.sql$//' | sort -u)
+            ALL_BACKUPS=$(oci os object list -bn "$BUCKET_NAME" --query "data[].name" --raw-output 2>/dev/null | jq -r '.[]' 2>/dev/null || echo "")
+
+            if [ -n "$ALL_BACKUPS" ]; then
+              DB_NAMES=$(echo "$ALL_BACKUPS" | grep -E '.*-backup-.*\.sql$' | sed -E 's/-backup-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}\.sql$//' | sort -u)
+            else
+              echo "No existing backups found in bucket."
+              DB_NAMES=""
+            fi
 
             for DB_NAME in $DB_NAMES; do
               echo "Processing retention for database: $DB_NAME"
@@ -155,8 +171,14 @@ job "postgres-backup" {
 
               # Check if we got any results and count them properly
               if [ -n "$BACKUP_FILES" ]; then
-                BACKUP_COUNT=$(echo "$BACKUP_FILES" | wc -l)
+                BACKUP_COUNT=$(echo "$BACKUP_FILES" | wc -l | tr -d ' ')
                 echo "Found $BACKUP_COUNT backups for $DB_NAME"
+
+                # Ensure BACKUP_COUNT is a valid integer
+                if ! [[ "$BACKUP_COUNT" =~ ^[0-9]+$ ]]; then
+                  echo "Invalid backup count for $DB_NAME, skipping retention cleanup."
+                  continue
+                fi
 
                 if [ "$BACKUP_COUNT" -gt 7 ]; then
                   echo "Keeping newest 7, deleting $(($BACKUP_COUNT - 7)) old backups..."
