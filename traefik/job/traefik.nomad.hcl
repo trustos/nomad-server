@@ -19,24 +19,33 @@ job "traefik" {
       }
     }
 
-    task "init-traefik-storage" {
+    task "init-traefik-dynamic-dir" {
+      driver = "raw_exec"
+      lifecycle {
+        hook = "prestart"
+      }
+      config {
+        command = "mkdir"
+        args    = ["-p", "/mnt/glusterfs/traefik/dynamic"]
+      }
+      resources {
+        cpu    = 10
+        memory = 10
+      }
+    }
+
+    task "init-traefik-acme-files" {
       driver = "raw_exec"
       lifecycle {
         hook = "prestart"
       }
       config {
         command = "bash"
-        args = [
-          "-c",
-          "mkdir -p /mnt/glusterfs/traefik/dynamic && \
-           chown -R nomad:nomad /mnt/glusterfs/traefik && \
-           touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json && \
-           chmod 600 /mnt/glusterfs/traefik/acme-*.json"
-        ]
+        args = ["-c", "touch /mnt/glusterfs/traefik/acme-stag.json /mnt/glusterfs/traefik/acme-prod.json  && chmod 600 /mnt/glusterfs/traefik/acme-*.json"]
       }
       resources {
-        cpu    = 20
-        memory = 20
+        cpu = 10
+        memory = 10
       }
     }
 
