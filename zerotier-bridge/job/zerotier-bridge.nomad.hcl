@@ -8,6 +8,8 @@ job "zerotier-bridge" {
     task "zerotier-nat-forward" {
       driver = "raw_exec"
 
+      user = "root"  # Add this line
+
       config {
         command = "bash"
         args = [
