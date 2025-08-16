@@ -137,6 +137,12 @@ job "nomad-ops" {
          env         = true
       }
 
+      template {
+        data = ""
+        destination = "local/known_hosts"
+        perms = "600"
+      }
+
       env {
 
         NOMAD_OPS_LOCAL_REPO_DIR = "/data/repos"
@@ -146,7 +152,8 @@ job "nomad-ops" {
 
         TRACE = "FALSE"
 
-        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+        SSH_KNOWN_HOSTS = "${NOMAD_TASK_DIR}/known_hosts"
+        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=${NOMAD_TASK_DIR}/known_hosts -o LogLevel=ERROR"
       }
 
       # Configuration is specific to each driver.
