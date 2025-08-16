@@ -141,6 +141,10 @@ job "nomad-ops" {
         NOMAD_ADDR = "http://${NOMAD_IP_http}:4646"
 
         TRACE = "FALSE"
+
+
+        SSH_KNOWN_HOSTS = ""
+        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
       }
 
       # Configuration is specific to each driver.
