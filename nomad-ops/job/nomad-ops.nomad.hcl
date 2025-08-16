@@ -142,7 +142,7 @@ job "nomad-ops" {
 
       template {
         data = "# SSH known_hosts file for nomad-ops\n"
-        destination = "local/known_hosts"
+        destination = "secrets/known_hosts"
         perms = "600"
       }
 
@@ -157,8 +157,8 @@ job "nomad-ops" {
 
         TRACE = "FALSE"
 
-        SSH_KNOWN_HOSTS = "${NOMAD_TASK_DIR}/known_hosts"
-        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=${NOMAD_TASK_DIR}/known_hosts -o LogLevel=ERROR"
+        SSH_KNOWN_HOSTS = "/secrets/known_hosts"
+        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/secrets/known_hosts -o LogLevel=ERROR"
       }
 
       # Configuration is specific to each driver.
