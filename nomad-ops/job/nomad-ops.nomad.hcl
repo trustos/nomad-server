@@ -146,7 +146,6 @@ job "nomad-ops" {
 
         TRACE = "FALSE"
 
-        SSH_KNOWN_HOSTS = "/dev/null"
         GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
       }
 
