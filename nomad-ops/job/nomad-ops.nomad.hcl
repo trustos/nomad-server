@@ -151,16 +151,17 @@ job "nomad-ops" {
 
         TRACE = "FALSE"
 
-        SSH_KNOWN_HOSTS = "/tmp/known_hosts"
-        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/known_hosts -o LogLevel=ERROR"
+        SSH_KNOWN_HOSTS = ""
+        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
       }
 
       # Configuration is specific to each driver.
       config {
         image = "ghcr.io/trustos/nomad-ops:latest"
-        entrypoint = ["/bin/sh", "-c"]
         args = [
-          "echo '# SSH known_hosts' > /tmp/known_hosts && chmod 600 /tmp/known_hosts && exec nomad-ops serve --http 0.0.0.0:8080 --dir /data/pb_data"
+          "serve",
+          "--http", "0.0.0.0:8080",
+          "--dir", "/data/pb_data"
         ]
 
         ports = [
