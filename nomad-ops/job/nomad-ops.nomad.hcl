@@ -71,40 +71,7 @@ job "nomad-ops" {
     }
 
 
-    task "init-ssh-known-hosts" {
-      lifecycle {
-        hook    = "prestart"
-        sidecar = false
-      }
 
-      driver = "raw_exec"
-
-      config {
-        command = "bash"
-        args = [
-          "-c",
-          <<-EOT
-          #!/bin/bash
-          set -e
-
-          # Create .ssh directory in the mounted volume
-          mkdir -p /mnt/glusterfs/nomad-ops/.ssh
-
-          # Create known_hosts file
-          echo "# SSH known_hosts file for nomad-ops" > /mnt/glusterfs/nomad-ops/.ssh/known_hosts
-
-          # Set proper permissions
-          chmod 600 /mnt/glusterfs/nomad-ops/.ssh/known_hosts
-          chmod 700 /mnt/glusterfs/nomad-ops/.ssh
-          EOT
-        ]
-      }
-
-      resources {
-        cpu    = 100
-        memory = 64
-      }
-    }
 
 
 
@@ -184,17 +151,16 @@ job "nomad-ops" {
 
         TRACE = "FALSE"
 
-        SSH_KNOWN_HOSTS = "/data/.ssh/known_hosts"
-        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/data/.ssh/known_hosts -o LogLevel=ERROR"
+        SSH_KNOWN_HOSTS = "/tmp/known_hosts"
+        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/known_hosts -o LogLevel=ERROR"
       }
 
       # Configuration is specific to each driver.
       config {
         image = "ghcr.io/trustos/nomad-ops:latest"
+        entrypoint = ["/bin/sh", "-c"]
         args = [
-          "serve",
-          "--http", "0.0.0.0:8080",
-          "--dir", "/data/pb_data"
+          "echo '# SSH known_hosts' > /tmp/known_hosts && chmod 600 /tmp/known_hosts && exec nomad-ops serve --http 0.0.0.0:8080 --dir /data/pb_data"
         ]
 
         ports = [
