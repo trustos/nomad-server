@@ -70,6 +70,39 @@ job "nomad-ops" {
       }
     }
 
+    task "init-ssh-known-hosts" {
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        image = "busybox:latest"
+        command = "sh"
+        args = [
+          "-c",
+          "mkdir -p /data/.ssh && echo '# SSH known_hosts file for nomad-ops' > /data/.ssh/known_hosts && chmod 600 /data/.ssh/known_hosts && chmod 700 /data/.ssh"
+        ]
+
+        mounts = [
+          {
+            type = "bind"
+            source = "/mnt/glusterfs/nomad-ops"
+            target = "/data"
+            readonly = false
+          }
+        ]
+      }
+
+      resources {
+        cpu    = 100
+        memory = 64
+      }
+    }
+
+
 
 
 
@@ -140,11 +173,7 @@ job "nomad-ops" {
          env         = true
       }
 
-      template {
-        data = "# SSH known_hosts file for nomad-ops\n"
-        destination = "secrets/known_hosts"
-        perms = "600"
-      }
+
 
 
 
@@ -157,13 +186,16 @@ job "nomad-ops" {
 
         TRACE = "FALSE"
 
-        SSH_KNOWN_HOSTS = "/secrets/known_hosts"
-        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/secrets/known_hosts -o LogLevel=ERROR"
+        SSH_KNOWN_HOSTS = "/data/.ssh/known_hosts"
+        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/data/.ssh/known_hosts -o LogLevel=ERROR"
       }
 
       # Configuration is specific to each driver.
       config {
         image = "ghcr.io/trustos/nomad-ops:latest"
+
+
+
         args = [
           "serve",
           "--http", "0.0.0.0:8080",
