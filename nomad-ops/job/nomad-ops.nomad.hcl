@@ -138,7 +138,7 @@ job "nomad-ops" {
       }
 
       template {
-        data = ""
+        data = "# SSH known_hosts file for nomad-ops\n"
         destination = "local/known_hosts"
         perms = "600"
       }
