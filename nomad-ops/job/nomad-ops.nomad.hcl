@@ -72,49 +72,7 @@ job "nomad-ops" {
 
 
 
-    task "init-ssh-config" {
-      lifecycle {
-        hook    = "prestart"
-        sidecar = false
-      }
 
-      driver = "raw_exec"
-
-      config {
-        command = "bash"
-        args = [
-          "-c",
-          <<-EOT
-          #!/bin/bash
-          set -e
-
-          # Create .ssh directory
-          mkdir -p /mnt/glusterfs/nomad-ops/.ssh
-
-          # Create SSH config file with flexible host key handling
-          cat > /mnt/glusterfs/nomad-ops/.ssh/config << 'EOF'
-Host *
-    StrictHostKeyChecking accept-new
-    UserKnownHostsFile /data/.ssh/known_hosts
-    LogLevel ERROR
-EOF
-
-          # Create empty known_hosts file
-          touch /mnt/glusterfs/nomad-ops/.ssh/known_hosts
-
-          # Set proper permissions
-          chmod 600 /mnt/glusterfs/nomad-ops/.ssh/config
-          chmod 600 /mnt/glusterfs/nomad-ops/.ssh/known_hosts
-          chmod 700 /mnt/glusterfs/nomad-ops/.ssh
-          EOT
-        ]
-      }
-
-      resources {
-        cpu    = 100
-        memory = 64
-      }
-    }
 
     network {
       port "http" {
@@ -188,9 +146,8 @@ EOF
 
         TRACE = "FALSE"
 
-
-        SSH_KNOWN_HOSTS = "/data/.ssh/known_hosts"
-        GIT_SSH_COMMAND = "ssh -F /data/.ssh/config"
+        SSH_KNOWN_HOSTS = "/dev/null"
+        GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
       }
 
       # Configuration is specific to each driver.
