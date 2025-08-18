@@ -89,7 +89,11 @@ job "nomad-ops" {
           # Ensure the nomad-ops directory exists
           mkdir -p /mnt/glusterfs/nomad-ops/.ssh
 
+          # Also create system-wide SSH directory for fallback
+          mkdir -p /etc/ssh
+
           # Create SSH known_hosts file with correct and complete host keys
+          # Create it in multiple locations to ensure go-git can find it
           cat > /mnt/glusterfs/nomad-ops/.ssh/known_hosts << 'EOF'
 # GitHub
 github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
@@ -107,13 +111,18 @@ bitbucket.org ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNT
 bitbucket.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIazEu89wgQZ4bqs3d63QSMzYVa0MuJ2e2gKTKqu+UUO
 EOF
 
+          # Copy to system-wide location as fallback
+          cp /mnt/glusterfs/nomad-ops/.ssh/known_hosts /etc/ssh/ssh_known_hosts
+
           # Set proper permissions
           chmod 600 /mnt/glusterfs/nomad-ops/.ssh/known_hosts
           chmod 700 /mnt/glusterfs/nomad-ops/.ssh
+          chmod 644 /etc/ssh/ssh_known_hosts
 
-          # Verify the file exists
+          # Verify the file exists in both locations
           ls -la /mnt/glusterfs/nomad-ops/.ssh/known_hosts
-          echo "SSH known_hosts file initialized successfully"
+          ls -la /etc/ssh/ssh_known_hosts
+          echo "SSH known_hosts file initialized successfully in multiple locations"
           EOT
         ]
       }
@@ -194,7 +203,7 @@ EOF
 
         TRACE = "FALSE"
 
-        SSH_KNOWN_HOSTS = "/data/.ssh/known_hosts"
+        SSH_KNOWN_HOSTS = "/data/.ssh/known_hosts:/etc/ssh/ssh_known_hosts"
       }
 
       # Configuration is specific to each driver.
