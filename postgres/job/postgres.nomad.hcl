@@ -93,7 +93,8 @@ job "postgres-stack" {
         mounts = [
           {
             type     = "bind"
-            source   = "/mnt/glusterfs/postgres/data16"
+            # source   = "/mnt/glusterfs/postgres/data16"
+            source   = "/opt/postgres/data16"
             target   = "/var/lib/postgresql/data"
             readonly = false
           }
@@ -111,8 +112,8 @@ job "postgres-stack" {
       }
 
       resources {
-        cpu    = 500
-        memory = 512
+        cpu    = 2000
+        memory = 4096
       }
 
       service {
@@ -217,8 +218,8 @@ EOH
       }
 
       resources {
-        cpu    = 300
-        memory = 256
+        cpu    = 800
+        memory = 800
       }
 
       service {
@@ -226,8 +227,15 @@ EOH
         port = "http"
         tags = [
           "traefik.enable=true",
+          # HTTPS router
           "traefik.http.routers.pgadmin.rule=Host(`pgadmin.rs-estates`)",
-          "traefik.http.routers.pgadmin.entrypoints=web",
+          "traefik.http.routers.pgadmin.entrypoints=websecure",
+          "traefik.http.routers.pgadmin.tls=true",
+
+          # HTTP -> HTTPS redirect
+          "traefik.http.routers.pgadmin-http.rule=Host(`pgadmin.rs-estates`)",
+          "traefik.http.routers.pgadmin-http.entrypoints=web",
+          "traefik.http.routers.pgadmin-http.middlewares=redirect-to-https@file"
         ]
       }
     }
