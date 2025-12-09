@@ -4,6 +4,12 @@ job "postgres-stack" {
   group "postgres" {
     count = 1
 
+    # Pin PostgreSQL to node with local data
+    constraint {
+      attribute = "${node.unique.name}"
+      value     = "inst-ryizk-nomad-instance-pool-large-node-v1755514437494"
+    }
+
     network {
       port "db" {
         static = 5432
@@ -23,7 +29,8 @@ job "postgres-stack" {
         command = "bash"
         args = [
           "-c",
-          "mkdir -p /mnt/glusterfs/postgres/data16 && chown -R 999:999 /mnt/glusterfs/postgres/data16"
+          # "mkdir -p /mnt/glusterfs/postgres/data16 && chown -R 999:999 /mnt/glusterfs/postgres/data16"
+          "mkdir -p /opt/postgres/data16 && chown -R 999:999 /opt/postgres/data16"
         ]
       }
 
